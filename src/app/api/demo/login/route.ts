@@ -3,15 +3,7 @@
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
 import { DemoLoginSchema } from "@/contracts/api";
-
-// Maps demo persona → seeded user email (must match scripts/seed data).
-const PERSONA_EMAIL: Record<string, string> = {
-  faculty:  "priya.raman@demo.allotiq.in",
-  club:     "aiclub@demo.allotiq.in",
-  student:  "rahul.s@demo.allotiq.in",
-  approver: "judge@demo.allotiq.in",
-  admin:    "facilities@demo.allotiq.in",
-};
+import { PERSONAS, emailOf } from "@/lib/seed/catalog";
 
 // Where each persona lands after sign-in.
 const PERSONA_REDIRECT: Record<string, string> = {
@@ -33,8 +25,9 @@ export async function POST(req: Request) {
     return apiError(400, "BAD_REQUEST", parsed.error.issues[0]?.message ?? "Invalid body");
 
   const { persona } = parsed.data;
-  const email = PERSONA_EMAIL[persona];
-  if (!email) return apiError(400, "BAD_REQUEST", `Unknown persona: ${persona}`);
+  // The seeded account for this persona. A magic link for an unknown email would create a new auth user
+  // with no profile, so the email must come from the seed catalog.
+  const email = emailOf(PERSONAS[persona]);
 
   const supabase = db();
 
