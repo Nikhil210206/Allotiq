@@ -562,6 +562,176 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analytics_bookings: {
+        Args: {
+          p_building_code?: string
+          p_from: string
+          p_room_type?: string
+          p_to: string
+          p_weekday?: number
+        }
+        Returns: {
+          building_code: string
+          ends: string
+          ghost: boolean
+          headcount: number
+          held: boolean
+          request_id: string
+          requester_kind: Database["public"]["Enums"]["requester_kind"]
+          room_code: string
+          room_id: string
+          room_type: string
+          starts: string
+          status: Database["public"]["Enums"]["request_status"]
+          title: string
+          unplaced_reason: string
+          used: boolean
+        }[]
+      }
+      analytics_ghost_rate: {
+        Args: {
+          p_building_code?: string
+          p_from: string
+          p_group_by: string
+          p_room_type?: string
+          p_to: string
+        }
+        Returns: {
+          bookings: number
+          ghosts: number
+          group_key: string
+          label: string
+          rate_pct: number
+        }[]
+      }
+      analytics_heatmap: {
+        Args: { p_building_code?: string; p_from: string; p_room_type?: string; p_to: string }
+        Returns: {
+          booked: number
+          hour: number
+          occupancy: number
+          room_hours: number
+          weekday: number
+        }[]
+      }
+      analytics_hour_slots: {
+        Args: { p_building_code?: string; p_from: string; p_room_type?: string; p_to: string }
+        Returns: {
+          building_code: string
+          hour: number
+          room_id: string
+          slot_start: string
+          weekday: number
+        }[]
+      }
+      analytics_idle_building_hours: {
+        Args: { p_building_code?: string; p_from: string; p_room_type?: string; p_to: string }
+        Returns: {
+          building_code: string
+          idle_hours: number
+          open_hours: number
+        }[]
+      }
+      analytics_open_windows: {
+        Args: {
+          p_building_code?: string
+          p_from: string
+          p_room_type?: string
+          p_to: string
+          p_weekday?: number
+        }
+        Returns: {
+          building_code: string
+          closes: string
+          day: string
+          opens: string
+          room_id: string
+        }[]
+      }
+      analytics_rooms: {
+        Args: { p_building_code?: string; p_room_type?: string }
+        Returns: {
+          building_code: string
+          close_time: string
+          code: string
+          is_active: boolean
+          name: string
+          open_days: number[]
+          open_time: string
+          room_id: string
+          type: Database["public"]["Enums"]["room_type"]
+        }[]
+      }
+      analytics_time_band: { Args: { p_at: string }; Returns: string }
+      analytics_time_band_label: { Args: { p_band: string }; Returns: string }
+      analytics_underused_rooms: {
+        Args: {
+          p_building_code?: string
+          p_from: string
+          p_room_type?: string
+          p_threshold_pct: number
+          p_to: string
+          p_weekday?: number
+        }
+        Returns: {
+          building_code: string
+          code: string
+          name: string
+          occupancy_pct: number
+          open_hours: number
+          room_id: string
+          type: Database["public"]["Enums"]["room_type"]
+          used_hours: number
+        }[]
+      }
+      analytics_unmet_demand: {
+        Args: {
+          p_building_code?: string
+          p_from: string
+          p_group_by: string
+          p_room_type?: string
+          p_to: string
+        }
+        Returns: {
+          group_key: string
+          label: string
+          requests: number
+          seats: number
+        }[]
+      }
+      analytics_unmet_requests: {
+        Args: { p_building_code?: string; p_from: string; p_room_type?: string; p_to: string }
+        Returns: {
+          ends: string
+          headcount: number
+          reason: string
+          request_id: string
+          room_type: string
+          starts: string
+          title: string
+        }[]
+      }
+      analytics_utilization: {
+        Args: {
+          p_building_code?: string
+          p_from: string
+          p_room_type?: string
+          p_to: string
+          p_weekday?: number
+        }
+        Returns: {
+          bookings: number
+          building_code: string
+          code: string
+          is_active: boolean
+          name: string
+          occupancy_pct: number
+          open_hours: number
+          room_id: string
+          type: Database["public"]["Enums"]["room_type"]
+          used_hours: number
+        }[]
+      }
       apply_plan: {
         Args: {
           p_action: string

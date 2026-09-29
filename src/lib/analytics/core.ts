@@ -1,4 +1,4 @@
-// Typed calls into the analytics_* SQL functions (supabase/analytics/analytics.sql), plus the dashboard
+// Typed calls into the analytics_* SQL functions (supabase/migrations/20260929134309_analytics.sql), plus the dashboard
 // built from them. Takes the query runner as an argument so it runs against Supabase in the app and against
 // a plain Postgres in the parity check. Server code imports ./index, not this. Owner: Nikhil · N7
 import type { RoomType } from "@/contracts/domain";

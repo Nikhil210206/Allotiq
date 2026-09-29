@@ -10,7 +10,7 @@ Read this before writing code. If you use an AI coding assistant, point it at th
 | API bodies (Zod) + responses | `src/contracts/api.ts` | PR approved by all 3 |
 | LLM schemas | `src/contracts/ai.ts` | PR approved by all 3 |
 | Database schema, triggers, RLS | `supabase/migrations/*.sql` | Aditi only (`supabase db push`) |
-| Analytics functions (`analytics_*`, read-only) | `supabase/analytics/analytics.sql` — idempotent, re-run after any change | Nikhil |
+| Analytics functions (`analytics_*`, read-only) | `supabase/migrations/*_analytics.sql` — change them in a new migration, never by editing an applied one | Nikhil (Aditi runs `supabase db push`) |
 
 The TypeScript `TRANSITIONS` table and the SQL `is_valid_transition()` must always match.
 

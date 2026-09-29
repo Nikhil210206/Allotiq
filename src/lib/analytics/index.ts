@@ -1,20 +1,25 @@
-// Thin wrappers over the analytics_* SQL functions (supabase/analytics/analytics.sql). The five tool
-// functions are also the ONLY tools "Ask the dashboard" may call. Owner: Nikhil · N7
+// Thin wrappers over the analytics_* SQL functions (supabase/migrations/20260929134309_analytics.sql).
+// The five tool functions are also the ONLY tools "Ask the dashboard" may call. Owner: Nikhil · N7
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { db } from "@/lib/db/server";
+import type { Database } from "@/lib/db/types.gen";
 import { analytics, type Rpc } from "./core";
 
 export type * from "./core";
+
+type AnalyticsFn = Extract<keyof Database["public"]["Functions"], `analytics_${string}`>;
 
 /** The analytics SQL hasn't been applied to this database yet (PostgREST can't find the function). */
 export class AnalyticsNotInstalled extends Error {}
 
 const rpc: Rpc = async (fn, args) => {
-  // analytics_* live in supabase/analytics/analytics.sql, not in the generated types, so call untyped.
-  const { data, error } = await (db() as unknown as SupabaseClient).rpc(fn, args);
+  // core.ts names the function at runtime (it also runs against plain Postgres), so narrow it here.
+  const { data, error } = await db().rpc(
+    fn as AnalyticsFn,
+    args as Database["public"]["Functions"][AnalyticsFn]["Args"],
+  );
   if (error?.code === "PGRST202")
-    throw new AnalyticsNotInstalled(`${fn} is missing — run supabase/analytics/analytics.sql on this database`);
+    throw new AnalyticsNotInstalled(`${fn} is missing — apply supabase/migrations (supabase db push)`);
   if (error) throw new Error(`${fn}: ${error.message}`);
   return (data ?? []) as unknown[];
 };
