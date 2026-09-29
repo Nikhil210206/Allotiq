@@ -31,9 +31,11 @@ export async function POST(
   // Approvers can only decide requests for rooms they manage
   if (!(await canDecide(supabase, actor, r.room_id)))
     return apiError(403, "FORBIDDEN", "Not your room.");
+  if (r.status !== "pending")
+    return apiError(409, "INVALID_TRANSITION", "Only pending requests can be approved here.");
 
   try {
-    await transition(id, "approved", { actorId: actor.id, action: "approve", patch: { decided_by: actor.id } });
+    await transition(id, "approved", { actorId: actor.id, expectedStatus: "pending", action: "approve", patch: { decided_by: actor.id } });
   } catch (e) {
     return apiError(409, "TRANSITION_ERROR", (e as Error).message);
   }

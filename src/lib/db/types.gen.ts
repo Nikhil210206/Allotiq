@@ -742,6 +742,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_disruption: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_at: string
+          p_end: string
+          p_expected_states: Json
+          p_moves: Json
+          p_reason: string
+          p_room_id: string
+          p_start: string
+        }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
       is_valid_transition: {
         Args: {

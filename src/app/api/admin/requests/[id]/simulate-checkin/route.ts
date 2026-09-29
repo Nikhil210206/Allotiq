@@ -11,8 +11,9 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let actor;
   try {
-    await requireRole("admin");
+    actor = await requireRole("admin");
   } catch (e) {
     return e as Response;
   }
@@ -31,7 +32,8 @@ export async function POST(
   const now = await getNow();
   try {
     await transition(id, "checked_in", {
-      actorId: null,
+      actorId: actor.id,
+      expectedStatus: "approved",
       action: "simulate_checkin",
       patch: { checked_in_at: now },
     });

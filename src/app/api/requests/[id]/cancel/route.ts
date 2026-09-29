@@ -32,7 +32,7 @@ export async function POST(
     return apiError(403, "FORBIDDEN", "Not your request.");
 
   try {
-    await transition(id, "cancelled", { actorId: actor.id, action: "cancel" });
+    await transition(id, "cancelled", { actorId: actor.id, expectedStatus: r.status, action: "cancel" });
   } catch (e) {
     return apiError(409, "TRANSITION_ERROR", (e as Error).message);
   }

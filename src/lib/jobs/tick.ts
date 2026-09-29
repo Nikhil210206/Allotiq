@@ -39,10 +39,10 @@ export async function runTick(): Promise<TickResult> {
     .from("requests")
     .select("id, requester_id, title")
     .eq("status", "pending")
-    .lt("hold_expires_at", now);
+    .lte("hold_expires_at", now);
 
   await each(toExpire, async (r) => {
-    await transition(r.id, "expired", { actorId: null, action: "auto_expire" });
+    await transition(r.id, "expired", { actorId: null, expectedStatus: "pending", action: "auto_expire" });
     await notify(r.requester_id, {
       kind: "expired",
       title: `"${r.title}" hold expired`,
@@ -66,7 +66,7 @@ export async function runTick(): Promise<TickResult> {
     const { start, end } = parseRange(r.during);
     if (nowMs < Date.parse(start) + TIMING.noShowGraceMinutes * 60_000) return;
 
-    await transition(r.id, "auto_released", { actorId: null, action: "auto_release" });
+    await transition(r.id, "auto_released", { actorId: null, expectedStatus: "approved", action: "auto_release" });
     await notify(r.requester_id, {
       kind: "auto_released",
       title: `"${r.title}" auto-released`,
@@ -87,7 +87,7 @@ export async function runTick(): Promise<TickResult> {
     const { end } = parseRange(r.during);
     if (nowMs < Date.parse(end)) return;
 
-    await transition(r.id, "completed", { actorId: null, action: "auto_complete" });
+    await transition(r.id, "completed", { actorId: null, expectedStatus: "checked_in", action: "auto_complete" });
     result.completed++;
     if (r.room_id) freed.push({ roomId: r.room_id, start: now, end });
   });
@@ -112,6 +112,7 @@ export async function runTick(): Promise<TickResult> {
         try {
           await transition(w.id, "approved", {
             actorId: null,
+            expectedStatus: "waitlisted",
             action: "waitlist_fill",
             patch: { room_id: slot.roomId },
           });

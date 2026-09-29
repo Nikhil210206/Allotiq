@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ACTIVE_STATUSES, PURPOSE_PRIORITY, TZ } from "@/contracts/domain";
+import type { RequestDraft } from "@/contracts/api";
 import { DEFAULT_WEIGHTS, type Plan } from "@/contracts/engine";
 import type { Database } from "@/lib/db/types.gen";
 
@@ -13,7 +14,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/server", () => ({ db: () => ({ from: mockFrom, rpc: mockRpc }) }));
 vi.mock("@/lib/clock", () => ({ getNow: mockGetNow }));
 
-import { loadEngineContext, loadEngineRequest, mapRequestToEngineRequest, persistPlan } from "@/server/engine-adapter";
+import { loadEngineContext, loadEngineRequest, loadEngineRequestForDraft, mapRequestToEngineRequest, persistPlan } from "@/server/engine-adapter";
 
 type Tables = Record<string, Record<string, unknown>[]>;
 let tables: Tables;
@@ -256,6 +257,42 @@ describe("A6 engine adapter", () => {
     expect(mapped.priority).toBe(PURPOSE_PRIORITY.exam);
     expect(mapped.deptId).toBe("dept-1");
     expect(mapped.history).toEqual({ "room-old": 2, "room-other": 1 });
+  });
+
+  it("maps an unsaved recommendation draft using the requester profile and completed history", async () => {
+    setup({
+      profiles: [{ id: "profile-1", department_id: "dept-1" }],
+      requests: [
+        { id: "past-1", requester_id: "profile-1", status: "completed", room_id: "room-old" },
+        { id: "past-2", requester_id: "profile-1", status: "completed", room_id: "room-old" },
+        { id: "other-user", requester_id: "profile-2", status: "completed", room_id: "room-wrong" },
+      ],
+    });
+    const draft: RequestDraft = {
+      title: "Exam",
+      purpose: "exam",
+      headcount: 60,
+      minSystems: 12,
+      requiredFeatures: ["projector"],
+      roomType: "classroom",
+      preferredBuildingId: "building-2",
+      during: { start: "2026-09-29T08:30:00Z", end: "2026-09-29T09:30:00Z" },
+      source: "form",
+      rawInput: null,
+    };
+
+    await expect(loadEngineRequestForDraft(draft, "profile-1", "2026-09-29T08:00:00Z")).resolves.toMatchObject({
+      requesterId: "profile-1",
+      deptId: "dept-1",
+      headcount: 60,
+      minSystems: 12,
+      features: ["projector"],
+      roomType: "classroom",
+      priority: PURPOSE_PRIORITY.exam,
+      createdAt: "2026-09-29T08:00:00Z",
+      preferredBuildingId: "building-2",
+      history: { "room-old": 2 },
+    });
   });
 
   it("uses valid configured weights and defaults for missing or malformed values", async () => {

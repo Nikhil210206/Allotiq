@@ -1,6 +1,7 @@
 // DB rows → EngineContext / EngineRequest, and Plan → apply_plan() RPC. Owner: Aaditya · A6
 import "server-only";
 import { ACTIVE_STATUSES, PURPOSE_PRIORITY, TZ, type Interval, type Purpose } from "@/contracts/domain";
+import type { RequestDraft } from "@/contracts/api";
 import { DEFAULT_WEIGHTS, type EngineBooking, type EngineContext, type EngineRequest, type EngineRoom, type Plan, type Weights } from "@/contracts/engine";
 import { getNow } from "@/lib/clock";
 import { parseRange } from "@/lib/db/mappers";
@@ -125,6 +126,48 @@ export async function loadEngineRequest(requestId: string): Promise<EngineReques
   }
 
   return mapRequestToEngineRequest(row, profileResult.data.department_id, history);
+}
+
+/** Map a validated, not-yet-persisted request draft for recommendations. */
+export async function loadEngineRequestForDraft(
+  draft: RequestDraft,
+  requesterId: string,
+  createdAt: string,
+): Promise<EngineRequest> {
+  const supabase = db();
+  const [profileResult, historyResult] = await Promise.all([
+    supabase.from("profiles").select("department_id").eq("id", requesterId).maybeSingle(),
+    supabase
+      .from("requests")
+      .select("room_id")
+      .eq("requester_id", requesterId)
+      .eq("status", "completed")
+      .not("room_id", "is", null),
+  ]);
+  throwReadError("requester profile", profileResult.error);
+  throwReadError("request history", historyResult.error);
+  if (!profileResult.data) throw new Error("Requester profile was not found");
+
+  const history: Record<string, number> = {};
+  for (const past of historyResult.data ?? []) {
+    if (past.room_id) history[past.room_id] = (history[past.room_id] ?? 0) + 1;
+  }
+
+  return {
+    // Recommendations do not expose assignments, so a stable internal id is sufficient here.
+    id: "recommendation-draft",
+    requesterId,
+    deptId: profileResult.data.department_id,
+    headcount: draft.headcount,
+    minSystems: draft.minSystems,
+    features: draft.requiredFeatures,
+    ...(draft.roomType ? { roomType: draft.roomType } : {}),
+    interval: draft.during,
+    priority: PURPOSE_PRIORITY[draft.purpose],
+    createdAt,
+    ...(draft.preferredBuildingId ? { preferredBuildingId: draft.preferredBuildingId } : {}),
+    history,
+  };
 }
 
 /** Load active rooms, catalog metadata, blackouts, and active bookings overlapping window. */

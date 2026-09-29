@@ -5,6 +5,7 @@ export * from "./score";
 export * from "./candidates";
 export * from "./alternatives";
 export * from "./recommend";
+export * from "./lab";
 export * from "./bump";
 export * from "./rehome";
 export * from "./waitlist";
