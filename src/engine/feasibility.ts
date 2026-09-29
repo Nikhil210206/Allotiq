@@ -1,7 +1,18 @@
 // Hard constraints. Returns every violation so the UI can say "why not". Owner: Aaditya · A1
-import { ACTIVE_STATUSES } from "@/contracts/domain";
+import { ACTIVE_STATUSES, TZ } from "@/contracts/domain";
 import type { EngineContext, EngineRequest, EngineRoom, Violation } from "@/contracts/engine";
 import { overlaps, withinHours } from "./time";
+
+const clockFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TZ,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function featureLabel(feature: string): string {
+  return feature.replaceAll("_", " ");
+}
 
 /**
  * Return every hard violation that prevents `req` from being placed in `room`.
@@ -31,7 +42,7 @@ export function hardViolations(room: EngineRoom, req: EngineRequest, _ctx: Engin
     if (!room.features.includes(f)) {
       vs.push({
         code: "FEATURE",
-        message: `Missing required feature: ${f}`,
+        message: `No ${featureLabel(f)}`,
       });
     }
   }
@@ -48,7 +59,7 @@ export function hardViolations(room: EngineRoom, req: EngineRequest, _ctx: Engin
   if (room.access === "dept_only" && room.deptId !== null && req.deptId !== room.deptId) {
     vs.push({
       code: "ACCESS",
-      message: `Room restricted to department ${room.deptId}`,
+      message: "Only for its own department",
     });
   }
 
@@ -78,7 +89,7 @@ export function hardViolations(room: EngineRoom, req: EngineRequest, _ctx: Engin
     if (activeSet.has(bk.status) && overlaps(req.interval, bk.interval)) {
       vs.push({
         code: "OVERLAP",
-        message: `Clashes with booking ${bk.requestId}`,
+        message: `Booked ${clockFormatter.format(new Date(bk.interval.start))}–${clockFormatter.format(new Date(bk.interval.end))}`,
       });
       break; // one overlap violation is enough
     }

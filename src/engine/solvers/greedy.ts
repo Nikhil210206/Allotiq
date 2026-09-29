@@ -1,6 +1,5 @@
 // Greedy: priority desc, fewest candidates first, best score. Owner: Aaditya · A3
 import type { Assignment, EngineContext, EngineRequest, SolveOptions, SolveResult, Solver, TraceEvent } from "@/contracts/engine";
-import { candidates } from "../candidates";
 import { isFeasible } from "../feasibility";
 import { computeMetrics } from "../metrics";
 import { scoreRoom } from "../score";
@@ -25,13 +24,15 @@ export const greedySolver: Solver = {
     };
 
     // Calculate initial candidate counts for sorting
+    const mustPlace = new Set(_opts?.mustPlace ?? []);
     const initialCandidateCounts = new Map<string, number>();
     for (const r of reqs) {
-      initialCandidateCounts.set(r.id, candidates(r, ctx).length);
+      initialCandidateCounts.set(r.id, ctx.rooms.reduce((count, room) => count + Number(isFeasible(room, r, ctx)), 0));
     }
 
     // Sort: priority desc, candidates asc, createdAt asc, id asc
     const sortedReqs = [...reqs].sort((a, b) => {
+      if (mustPlace.has(a.id) !== mustPlace.has(b.id)) return mustPlace.has(a.id) ? -1 : 1;
       if (b.priority !== a.priority) return b.priority - a.priority;
 
       const cA = initialCandidateCounts.get(a.id) ?? 0;

@@ -4,12 +4,6 @@ import { candidates } from "./candidates";
 import { isFeasible } from "./feasibility";
 import { scoreRoom } from "./score";
 
-/**
- * Slot offsets to probe for "same room, other slot" (in milliseconds).
- * Order matches the mock reference (samples.ts L101): closest future first.
- */
-const SLOT_SHIFTS_MS = [+2, -2, +4, +24, +48].map((h) => h * 3_600_000);
-
 const MAX_SAME_ROOM_SLOTS = 3;
 const MAX_SIMILAR_ROOMS = 3;
 
@@ -67,26 +61,39 @@ export function alternatives(req: EngineRequest, ctx: EngineContext, preferredRo
     const targetRoom = ctx.rooms.find((r) => r.id === targetRoomId);
 
     if (targetRoom) {
-      for (const shiftMs of SLOT_SHIFTS_MS) {
-        const newStartMs = Date.parse(req.interval.start) + shiftMs;
-        const newEndMs = newStartMs + duration;
+      const localDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(req.interval.start));
+      const firstDayStart = Date.parse(`${localDate}T00:00:00+05:30`);
+      const proposals: Array<{ interval: { start: string; end: string }; distance: number }> = [];
 
-        // Future-only: proposed start must be after ctx.now
-        if (newStartMs <= nowMs) continue;
+      // Scan 30-minute campus slots on the request day and following three days.
+      for (let day = 0; day <= 3; day++) {
+        const dayStart = firstDayStart + day * 24 * 60 * 60_000;
+        for (let minute = 0; minute < 24 * 60; minute += 30) {
+          const newStartMs = dayStart + minute * 60_000;
+          if (newStartMs <= nowMs) continue;
+          if (newStartMs === Date.parse(req.interval.start)) continue;
 
-        const newInterval = {
-          start: new Date(newStartMs).toISOString(),
-          end: new Date(newEndMs).toISOString(),
-        };
-
-        const altReq: EngineRequest = { ...req, interval: newInterval };
-
-        if (isFeasible(targetRoom, altReq, ctx)) {
-          sameRoomOtherSlot.push({ roomId: targetRoom.id, interval: newInterval });
+          const interval = {
+            start: new Date(newStartMs).toISOString(),
+            end: new Date(newStartMs + duration).toISOString(),
+          };
+          if (isFeasible(targetRoom, { ...req, interval }, ctx)) {
+            proposals.push({ interval, distance: Math.abs(newStartMs - Date.parse(req.interval.start)) });
+          }
         }
-
-        if (sameRoomOtherSlot.length >= MAX_SAME_ROOM_SLOTS) break;
       }
+
+      proposals.sort((a, b) =>
+        a.distance - b.distance || Date.parse(a.interval.start) - Date.parse(b.interval.start),
+      );
+      sameRoomOtherSlot.push(
+        ...proposals.slice(0, MAX_SAME_ROOM_SLOTS).map(({ interval }) => ({ roomId: targetRoom.id, interval })),
+      );
     }
   }
 

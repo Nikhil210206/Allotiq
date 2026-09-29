@@ -3,6 +3,7 @@
 // Owner: Aditi · Task D4
 import { requireRole, getSessionUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
+import type { Json } from "@/lib/db/types.gen";
 import { apiError } from "@/lib/http";
 import { rowToRoom } from "@/lib/db/mappers";
 import { RoomInputSchema } from "@/contracts/api";
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
       open_time: p.openTime,
       close_time: p.closeTime,
       open_days: p.openDays,
-      attributes: p.attributes,
+      attributes: p.attributes as Json | undefined,
       is_active: p.isActive,
     })
     .select()

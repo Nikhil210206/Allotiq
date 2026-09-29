@@ -78,6 +78,25 @@ describe("alternatives — return shape", () => {
 // ── sameRoomOtherSlot ─────────────────────────────────────────────
 
 describe("sameRoomOtherSlot", () => {
+  it("returns the nearest free 30-minute slot after an occupying booking", () => {
+    const room = makeRoom({
+      id: "R1",
+      booked: [{
+        requestId: "busy",
+        interval: { start: "2026-10-01T14:00:00+05:30", end: "2026-10-01T15:00:00+05:30" },
+        priority: 20,
+        status: "approved",
+        movable: true,
+      }],
+    });
+    const req = makeReq({ interval: { start: "2026-10-01T14:00:00+05:30", end: "2026-10-01T15:00:00+05:30" } });
+    const ctx = makeCtx({ rooms: [room], now: "2026-10-01T13:00:00+05:30" });
+
+    const result = alternatives(req, ctx, "R1");
+
+    expect(result.sameRoomOtherSlot.some((slot) => slot.interval.start === "2026-10-01T09:30:00.000Z")).toBe(true);
+  });
+
   it("uses preferredRoomId when provided", () => {
     const r1 = makeRoom({ id: "R1", capacity: 100 });
     const r2 = makeRoom({ id: "R2", capacity: 200 });
@@ -180,6 +199,20 @@ describe("sameRoomOtherSlot", () => {
 // ── similarRoomSameSlot ───────────────────────────────────────────
 
 describe("similarRoomSameSlot", () => {
+  it("does not include internal IDs in alternative explanations", () => {
+    const departmentId = "123e4567-e89b-12d3-a456-426614174000";
+    const room1 = makeRoom({ id: "223e4567-e89b-12d3-a456-426614174000", buildingId: "B1" });
+    const room2 = makeRoom({ id: "323e4567-e89b-12d3-a456-426614174000", buildingId: "B1" });
+    const req = makeReq({ deptId: departmentId });
+    const ctx = makeCtx({ rooms: [room1, room2], deptBuilding: { [departmentId]: "B1" } });
+
+    const result = alternatives(req, ctx, room1.id);
+    const why = result.similarRoomSameSlot.flatMap((recommendation) => recommendation.why).join(" ");
+
+    expect(why).toContain("Same building as your department");
+    expect(why).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  });
+
   it("excludes the preferred room", () => {
     const r1 = makeRoom({ id: "R1", capacity: 100 });
     const r2 = makeRoom({ id: "R2", capacity: 80 });

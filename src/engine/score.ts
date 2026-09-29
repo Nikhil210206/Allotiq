@@ -61,8 +61,7 @@ function featureMatchScore(room: EngineRoom, req: EngineRequest): number {
  * Algorithm:
  *   1. Determine the requester's "home" building: preferredBuildingId ?? deptBuilding[deptId].
  *   2. If the room is in that building → 1.0.
- *   3. If both buildings have lat/lng, use haversine distance with a campus-scale decay
- *      (1 km → ~0.5). Clamped to [0, 1].
+ *   3. If both buildings have lat/lng, use 1 - min(distanceMeters, 1500) / 1500.
  *   4. If no home building or no coordinates, return 0.5 (neutral).
  */
 function proximityScore(room: EngineRoom, req: EngineRequest, ctx: EngineContext): number {
@@ -77,12 +76,11 @@ function proximityScore(room: EngineRoom, req: EngineRequest, ctx: EngineContext
 
   if (roomBuilding?.lat != null && roomBuilding?.lng != null &&
       homeBuilding?.lat != null && homeBuilding?.lng != null) {
-    const dist = haversineKm(
+    const distMeters = haversineKm(
       homeBuilding.lat, homeBuilding.lng,
       roomBuilding.lat, roomBuilding.lng,
-    );
-    // Decay: 0 km → 1, ~0.5 km → ~0.5, >2 km → ~0. Campus scale.
-    return clamp(Math.exp(-dist * 2));
+    ) * 1000;
+    return clamp(1 - Math.min(distMeters, 1500) / 1500);
   }
 
   // Different building, no coordinates available → lower than same-building
@@ -90,24 +88,15 @@ function proximityScore(room: EngineRoom, req: EngineRequest, ctx: EngineContext
 }
 
 /**
- * Scarcity: prefer rooms with fewer overlapping active bookings in the requested slot.
- *
- * Source: EngineRoom.booked. UI hint: "Leaves rare rooms free for bigger needs".
- *
- * A completely free room → 1.0 (not scarce, good to use for small needs).
- * Each additional overlapping booking linearly decreases the score.
- *
- * NOTE: The contracts do not specify an exact formula. This uses:
- *   score = 1 / (1 + overlapping)
- * which is a simple deterministic decay: 0 → 1.0, 1 → 0.5, 2 → 0.33, etc.
- * No arbitrary cap is imposed.
+ * Scarcity preserves rare large rooms for requests that need their capacity.
+ * rarity = 1 / number of rooms with capacity >= this room's capacity.
+ * oversize = wasted capacity / room capacity; scarcity = clamp(1 - rarity * oversize).
  */
-function scarcityScore(room: EngineRoom, req: EngineRequest): number {
-  const activeSet = new Set<string>(ACTIVE_STATUSES);
-  const overlapping = room.booked.filter(
-    (bk) => activeSet.has(bk.status) && overlaps(req.interval, bk.interval),
-  ).length;
-  return 1 / (1 + overlapping);
+function scarcityScore(room: EngineRoom, req: EngineRequest, ctx: EngineContext): number {
+  const roomCount = ctx.rooms.filter((candidate) => candidate.capacity >= room.capacity).length;
+  const rarity = 1 / Math.max(1, roomCount);
+  const oversize = (room.capacity - req.headcount) / room.capacity;
+  return clamp(1 - rarity * oversize);
 }
 
 /**
@@ -115,14 +104,13 @@ function scarcityScore(room: EngineRoom, req: EngineRequest): number {
  *
  * Source: EngineRequest.history (engine.ts L46: "roomId → number of past completed bookings by this requester").
  *
- * Formula: 1 − 1/(1 + pastBookings). This gives:
- *   0 bookings → 0, 1 → 0.5, 2 → 0.67, 5 → 0.83, etc.
- * Simple, bounded, deterministic. No arbitrary constants.
+ * Formula: this room's completed booking count divided by the maximum count in history.
+ * Empty history scores 0; the most-used room scores 1.
  */
 function preferenceScore(room: EngineRoom, req: EngineRequest): number {
-  const pastBookings = req.history[room.id] ?? 0;
-  if (pastBookings === 0) return 0;
-  return 1 - 1 / (1 + pastBookings);
+  const maxHistory = Math.max(0, ...Object.values(req.history));
+  if (maxHistory === 0) return 0;
+  return (req.history[room.id] ?? 0) / maxHistory;
 }
 
 /**
@@ -176,7 +164,7 @@ export function scoreRoom(room: EngineRoom, req: EngineRequest, ctx: EngineConte
   const cf = capacityFitScore(room, req);
   const fm = featureMatchScore(room, req);
   const px = proximityScore(room, req, ctx);
-  const sc = scarcityScore(room, req);
+  const sc = scarcityScore(room, req, ctx);
   const pf = preferenceScore(room, req);
   const en = energyScore(room, req, ctx);
 
@@ -211,7 +199,7 @@ export function scoreRoom(room: EngineRoom, req: EngineRequest, ctx: EngineConte
 
   const homeBuildingId = req.preferredBuildingId ?? (req.deptId ? ctx.deptBuilding[req.deptId] : undefined);
   if (homeBuildingId && room.buildingId === homeBuildingId) {
-    notes.push(req.deptId ? `Same building as ${req.deptId}` : "In preferred building");
+    notes.push(req.deptId ? "Same building as your department" : "In preferred building");
   }
 
   const niceToHave = req.niceToHave ?? [];

@@ -3,6 +3,7 @@
 // Owner: Aditi · Task D4
 import { requireRole, getSessionUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
+import type { Json, TablesUpdate } from "@/lib/db/types.gen";
 import { apiError } from "@/lib/http";
 import { rowToRoom } from "@/lib/db/mappers";
 import { RoomInputSchema } from "@/contracts/api";
@@ -38,7 +39,7 @@ export async function PATCH(
     return apiError(400, "BAD_REQUEST", parsed.error.issues[0]?.message ?? "Invalid body");
 
   const p = parsed.data;
-  const patch: Record<string, unknown> = {};
+  const patch: TablesUpdate<"rooms"> = {};
   if (p.code !== undefined) patch.code = p.code;
   if (p.name !== undefined) patch.name = p.name;
   if (p.buildingId !== undefined) patch.building_id = p.buildingId;
@@ -52,7 +53,7 @@ export async function PATCH(
   if (p.openTime !== undefined) patch.open_time = p.openTime;
   if (p.closeTime !== undefined) patch.close_time = p.closeTime;
   if (p.openDays !== undefined) patch.open_days = p.openDays;
-  if (p.attributes !== undefined) patch.attributes = p.attributes;
+  if (p.attributes !== undefined) patch.attributes = p.attributes as Json;
   if (p.isActive !== undefined) patch.is_active = p.isActive;
 
   const supabase = db();

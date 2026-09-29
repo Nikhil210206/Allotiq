@@ -3,10 +3,9 @@
 // instead of waiting for the next real cron minute.
 // Owner: Aditi · Task D3
 import { requireRole } from "@/lib/auth/session";
-import { advanceClock, getNow, setClockOffset } from "@/lib/clock";
+import { advanceClock, getClockState, setClockOffset } from "@/lib/clock";
 import { apiError } from "@/lib/http";
 import { ClockSchema } from "@/contracts/api";
-import { db } from "@/lib/db/server";
 import { runTick, type TickResult } from "@/lib/jobs/tick";
 
 export async function POST(req: Request) {
@@ -21,13 +20,17 @@ export async function POST(req: Request) {
   if (!parsed.success)
     return apiError(400, "BAD_REQUEST", parsed.error.issues[0]?.message ?? "Invalid body");
 
-  if ("advanceMin" in parsed.data) {
-    await advanceClock(parsed.data.advanceMin);
-  } else {
-    const targetMs = Date.parse(parsed.data.setTo);
-    if (isNaN(targetMs)) return apiError(400, "BAD_REQUEST", "Invalid setTo timestamp");
-    const offsetMs = targetMs - Date.now();
-    await setClockOffset(offsetMs);
+  try {
+    if ("advanceMin" in parsed.data) {
+      await advanceClock(parsed.data.advanceMin);
+    } else {
+      const targetMs = Date.parse(parsed.data.setTo);
+      if (isNaN(targetMs)) return apiError(400, "BAD_REQUEST", "Invalid setTo timestamp");
+      const offsetMs = targetMs - Date.now();
+      await setClockOffset(offsetMs);
+    }
+  } catch {
+    return apiError(503, "CLOCK_UNAVAILABLE", "The virtual clock could not be updated");
   }
 
   // A failing tick must not undo or hide the clock change.
@@ -38,14 +41,10 @@ export async function POST(req: Request) {
     console.error("[admin/clock] tick failed:", e instanceof Error ? e.message : e);
   }
 
-  const now = await getNow();
-  const supabase = db();
-  const { data } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "clock_offset_ms")
-    .maybeSingle();
-
-  const offsetMs = data?.value ? Number(data.value) : 0;
-  return Response.json({ now, offsetMs, tick });
+  try {
+    const { now, offsetMs } = await getClockState();
+    return Response.json({ now, offsetMs, tick });
+  } catch {
+    return apiError(503, "CLOCK_UNAVAILABLE", "The virtual clock is temporarily unavailable");
+  }
 }

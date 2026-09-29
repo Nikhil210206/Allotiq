@@ -1,6 +1,7 @@
 // Thin wrappers over the analytics_* SQL functions (supabase/analytics/analytics.sql). The five tool
 // functions are also the ONLY tools "Ask the dashboard" may call. Owner: Nikhil · N7
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { db } from "@/lib/db/server";
 import { analytics, type Rpc } from "./core";
 
@@ -10,7 +11,8 @@ export type * from "./core";
 export class AnalyticsNotInstalled extends Error {}
 
 const rpc: Rpc = async (fn, args) => {
-  const { data, error } = await db().rpc(fn, args);
+  // analytics_* live in supabase/analytics/analytics.sql, not in the generated types, so call untyped.
+  const { data, error } = await (db() as unknown as SupabaseClient).rpc(fn, args);
   if (error?.code === "PGRST202")
     throw new AnalyticsNotInstalled(`${fn} is missing — run supabase/analytics/analytics.sql on this database`);
   if (error) throw new Error(`${fn}: ${error.message}`);

@@ -100,7 +100,7 @@ export async function POST(req: Request) {
 
   if (error) {
     // 23P01 = exclusion_violation (double-booking)
-    if (error.code === "23P01" || error.message.includes("no_double_booking")) {
+    if (roomId && (error.code === "23P01" || error.message.includes("no_double_booking"))) {
       // Fetch alternatives via the recommend endpoint logic (lightweight: just return similar rooms same slot)
       const { data: alts } = await supabase
         .from("requests")

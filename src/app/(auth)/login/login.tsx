@@ -2,7 +2,7 @@
 // Sign in: pick a demo persona (role cards). ?as=<persona> signs straight in — the judges' QR uses it.
 // Real campus sign-in (Supabase Auth, Aditi · D2) slots in behind the same /api/demo/login call.
 // Owner: Nikhil (UI) · Aditi (auth)
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { DITHER_GREEN, DitherField, Eyebrow, Headline, Wordmark, toast } from "@/components/kit";
@@ -18,7 +18,6 @@ const CARDS = [
 ] as const;
 
 export function Login() {
-  const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState<string | null>(null);
   const auto = useRef(false);
@@ -28,14 +27,14 @@ export function Login() {
       setBusy(persona);
       try {
         const { redirect } = await api.demo.login(persona);
-        router.push(redirect);
-        router.refresh();
+        // A full page load, not router.push: the client router can fetch the one-time link first and use it up.
+        window.location.assign(redirect);
       } catch (e) {
         toast(e instanceof Error ? e.message : "Couldn't sign in", "error");
         setBusy(null);
       }
     },
-    [router],
+    [],
   );
 
   useEffect(() => {
