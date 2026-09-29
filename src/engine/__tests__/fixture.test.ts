@@ -18,7 +18,7 @@ describe("half-open intervals", () => {
 });
 
 // CP1 gate (Aaditya): remove .skip once the solvers are implemented (task A4).
-describe.skip("brief fixture: FCFS 2/3 vs engine 3/3", () => {
+describe("brief fixture: FCFS 2/3 vs engine 3/3", () => {
   it("FCFS with tightest fit places only 2 of 3", () => {
     const res = getSolver("fcfs").solve(threeRequests, threeRoomCtx);
     expect(res.metrics.placed).toBe(2);
