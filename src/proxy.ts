@@ -23,7 +23,15 @@ export async function proxy(request: NextRequest) {
   });
 
   // getUser() revalidates the token and rotates it when expired; setAll above writes the new cookie.
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const path = request.nextUrl.pathname;
+  if (!user && !path.startsWith("/api") && !path.startsWith("/login") && !path.startsWith("/join")) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    return NextResponse.redirect(loginUrl);
+  }
+
   return response;
 }
 

@@ -8,6 +8,9 @@ import { rowToRequest } from "@/lib/db/mappers";
 import { getNow } from "@/lib/clock";
 import { CreateRequestSchema } from "@/contracts/api";
 import { PURPOSE_PRIORITY, TIMING } from "@/contracts/domain";
+import { alternatives } from "@/engine";
+import { loadEngineContext } from "@/server/engine-adapter";
+import type { EngineRequest } from "@/contracts/engine";
 
 export async function GET(req: Request) {
   let actor;
@@ -101,20 +104,28 @@ export async function POST(req: Request) {
   if (error) {
     // 23P01 = exclusion_violation (double-booking)
     if (roomId && (error.code === "23P01" || error.message.includes("no_double_booking"))) {
-      // Fetch alternatives via the recommend endpoint logic (lightweight: just return similar rooms same slot)
-      const { data: alts } = await supabase
-        .from("requests")
-        .select("room_id")
-        .eq("room_id", roomId)
-        .in("status", ["pending", "approved", "checked_in"])
-        .filter("during", "ov", `[${draft.during.start},${draft.during.end})`);
+      const ctx = await loadEngineContext();
+      const engReq: EngineRequest = {
+        id: "new",
+        requesterId: actor.id,
+        deptId: actor.departmentId,
+        headcount: draft.headcount,
+        minSystems: draft.minSystems,
+        features: draft.requiredFeatures as EngineRequest["features"],
+        roomType: draft.roomType,
+        interval: draft.during,
+        priority,
+        createdAt: now,
+        preferredBuildingId: draft.preferredBuildingId,
+        history: {},
+      };
+      const alts = alternatives(engReq, ctx, roomId);
 
       return Response.json(
         {
           error: "SLOT_TAKEN",
           message: "That room is already booked for the requested time. Choose an alternative.",
-          alternatives: { sameRoomOtherSlots: [], similarRoomsSameSlot: [], forRequest: roomId ?? "" },
-          conflict: alts,
+          alternatives: { ...alts, forRequest: roomId ?? "" },
         },
         { status: 409 },
       );
