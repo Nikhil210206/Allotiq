@@ -311,11 +311,14 @@ export function labRun(scenarioId: string): { results: SolveResult[]; explanatio
       ),
     };
   };
+  const engine = result("bnb", [["coding", "room-c"], ["workshop", "room-b"], ["ai", "room-a"]], 3);
+  // Like the real B&B, the engine's trace is the sequence of better plans it found (incumbents).
+  engine.trace = [
+    { type: "incumbent", objective: 2, placed: 2 },
+    { type: "incumbent", objective: 3, placed: 3 },
+  ];
   return {
-    results: [
-      result("fcfs", [["coding", "room-b"], ["workshop", "room-a"], ["ai", null]], 1),
-      result("bnb", [["coding", "room-c"], ["workshop", "room-b"], ["ai", "room-a"]], 3),
-    ],
+    results: [result("fcfs", [["coding", "room-b"], ["workshop", "room-a"], ["ai", null]], 1), engine],
     explanation:
       "FCFS gave Coding Club room B first-come. It didn't need a projector, so the engine moved it to C. That freed B for the Workshop and A for AI Club.",
   };

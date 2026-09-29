@@ -15,7 +15,8 @@ import type {
   RoomInput,
 } from "@/contracts";
 import type { Explanation, WeeklyInsight } from "@/contracts/ai";
-import type { AuditRow, DashboardFilters, RequestRow } from "@/lib/api/types";
+import type { SolveResult } from "@/contracts/engine";
+import type { AuditRow, DashboardFilters, LabReplayResponse, RequestRow } from "@/lib/api/types";
 import { stableId } from "@/lib/seed/random";
 import { fmtRange, istDate, istWeekday, minutesOf, toIso } from "@/lib/time";
 import { ask, metrics } from "./analytics";
@@ -304,7 +305,23 @@ export async function handleMock(method: string, url: string, body: unknown): Pr
   if (p === "/api/lab/scenarios") return ok(labScenarios());
   if (p === "/api/lab/run") {
     const run = labRun(String(b.scenarioId));
-    return ok({ runId: stableId("lab", `${b.scenarioId}-${Date.now()}`), ...run } satisfies LabRunResponse);
+    const runId = stableId("lab", `${b.scenarioId}-${Date.now()}`);
+    sessionStorage.setItem(`allotiq:lab-run:${runId}`, JSON.stringify(run));
+    return ok({ runId, ...run } satisfies LabRunResponse);
+  }
+  if (p === "/api/lab/replay") {
+    const saved = sessionStorage.getItem(`allotiq:lab-run:${b.runId}`);
+    if (!saved) return fail(404, "LAB_RUN_NOT_FOUND", "That Lab run was not found.");
+    const run = JSON.parse(saved) as { results: SolveResult[]; explanation: string };
+    const engine = run.results.find((r) => r.solver === "bnb") ?? run.results[0];
+    const body: LabReplayResponse = {
+      runId: String(b.runId),
+      baseline: engine,
+      results: [engine],
+      explanation: run.explanation,
+      comparison: { baselineSolver: engine.solver, replaySolver: engine.solver, changes: [] },
+    };
+    return ok(body);
   }
   if (p === "/api/lab/apply") return ok({ ok: true, applied: 0, note: "Sandbox scenario — nothing to write" });
   if (p === "/api/disruptions/preview") {

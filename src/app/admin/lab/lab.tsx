@@ -1,14 +1,29 @@
 "use client";
 // Allocation Lab (demo scene 2): the same requests, placed first-come-first-served and then by the
-// engine. Play FCFS drops the chips in one by one; Run engine glides them into the better plan (GSAP
-// Flip). Results come from /api/lab/run — the engine decides, this screen only shows it. Owner: Nikhil
+// engine. Play FCFS replays the FCFS solver's trace, dropping chips in the order it handled them; Run
+// engine replays the B&B search (each better plan it found) and then glides the chips into the final plan
+// (GSAP Flip). Replay re-solves the recorded run to show the plan is reproducible. Results come from
+// /api/lab/*: the engine decides, this screen only shows it. Owner: Nikhil
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, LoaderCircle, Play, RotateCcw, Sparkles } from "lucide-react";
+import { Check, FlaskConical, LoaderCircle, Play, Repeat, RotateCcw, Sparkles } from "lucide-react";
 import type { Room } from "@/contracts/domain";
 import type { EngineRequest, SolveResult } from "@/contracts/engine";
 import type { LabRunResponse } from "@/contracts";
-import { Delta, ErrorNote, Eyebrow, Headline, Loading, Panel, RoomCode, Select, Tag, toast } from "@/components/kit";
-import { Flip, gsap } from "@/components/kit/motion";
+import {
+  AnimatedNumber,
+  Delta,
+  EmptyState,
+  ErrorNote,
+  Eyebrow,
+  Headline,
+  Loading,
+  Panel,
+  RoomCode,
+  Select,
+  Tag,
+  toast,
+} from "@/components/kit";
+import { Flip, MOTION_REDUCED, gsap } from "@/components/kit/motion";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 import { useRooms } from "@/hooks/use-rooms";
@@ -18,7 +33,25 @@ import { fmtWhen } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 type Spot = string; // roomId | "queue" | "wall"
-type Mode = "idle" | "fcfs" | "engine";
+type Mode = "idle" | "fcfs" | "search" | "engine";
+type Incumbent = Extract<SolveResult["trace"][number], { type: "incumbent" }>;
+
+/** The search replay takes about this long, however many better plans the engine found. */
+const SEARCH_MS = 1800;
+/** Only the latest few better plans are listed; earlier ones collapse into "+N earlier". */
+const PLANS_SHOWN = 5;
+
+const pause = (ms: number) =>
+  new Promise((ok) => setTimeout(ok, typeof window !== "undefined" && window.matchMedia(MOTION_REDUCED).matches ? 0 : ms));
+
+/** Request ids in the order a solver handled them (its place/blocked trace), then any it didn't log. */
+function handledOrder(res: SolveResult, reqs: EngineRequest[]): string[] {
+  const ids = new Set(reqs.map((q) => q.id));
+  const seen = new Set<string>();
+  for (const e of res.trace) if ((e.type === "place" || e.type === "blocked") && ids.has(e.requestId)) seen.add(e.requestId);
+  const rest = [...reqs].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((q) => q.id);
+  return [...seen, ...rest.filter((id) => !seen.has(id))];
+}
 
 export function Lab() {
   const { data: scenarios, error, loading } = useApi("lab-scenarios", api.lab.scenarios);
@@ -26,7 +59,15 @@ export function Lab() {
   const sc = scenarios?.find((s) => s.id === picked) ?? scenarios?.[0];
   if (loading && !scenarios) return <Loading className="pt-16" rows={3} />;
   if (error && !scenarios) return <ErrorNote className="mt-16">{error.message}</ErrorNote>;
-  if (!sc) return null;
+  if (!sc)
+    return (
+      <EmptyState
+        className="mt-16"
+        icon={<FlaskConical />}
+        title="No Lab scenarios yet."
+        body="Scenarios are seeded with the demo data. Run Reset demo from the demo controls, then come back."
+      />
+    );
   return <Board key={sc.id} scenario={sc} scenarios={scenarios ?? []} onPick={setPicked} />;
 }
 
@@ -36,16 +77,32 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
   const [mode, setMode] = useState<Mode>("idle");
   const [spots, setSpots] = useState<Record<string, Spot>>(() => Object.fromEntries(scenario.requests.map((r) => [r.id, "queue"])));
   const [busy, setBusy] = useState(false);
+  /** Index of the better plan the search replay is showing (-1 before the search starts). */
+  const [step, setStep] = useState(-1);
+  /** Result of the last Replay: how many placements differed from the recording. */
+  const [replayed, setReplayed] = useState<number | null>(null);
   const board = useRef<HTMLDivElement>(null);
   const pending = useRef<Flip.FlipState | null>(null);
 
-  const rooms: Room[] = useMemo(
-    () => scenario.rooms ?? allRooms.filter((r) => scenario.roomIds?.includes(r.id)),
-    [scenario, allRooms],
-  );
   const fcfs = run?.results.find((r) => r.solver === "fcfs");
   const engine = run?.results.find((r) => r.solver !== "fcfs");
   const reqs = scenario.requests;
+
+  // Stored scenarios carry only requests, so the board shows the rooms the solvers actually used.
+  const rooms: Room[] = useMemo(() => {
+    if (scenario.rooms) return scenario.rooms;
+    const used = new Set(
+      scenario.roomIds ?? (run?.results ?? []).flatMap((r) => r.assignments.flatMap((a) => (a.roomId ? [a.roomId] : []))),
+    );
+    return allRooms.filter((r) => used.has(r.id));
+  }, [scenario, allRooms, run]);
+  const codeOf = (id: string | null | undefined) =>
+    (id && (rooms.find((r) => r.id === id) ?? allRooms.find((r) => r.id === id))?.code) || "a room";
+
+  const incumbents = useMemo(
+    () => (engine?.trace ?? []).filter((e): e is Incumbent => e.type === "incumbent"),
+    [engine],
+  );
 
   // Animate every chip from where it was to where React just put it.
   useLayoutEffect(() => {
@@ -78,15 +135,15 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
       const target = place(res);
       move(Object.fromEntries(reqs.map((q) => [q.id, "queue"])));
       setMode("fcfs");
-      // one request at a time, in the order they were submitted
-      const order = [...reqs].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      setStep(-1);
+      // one request at a time, in the order the FCFS solver handled them
       let acc: Record<string, Spot> = Object.fromEntries(reqs.map((q) => [q.id, "queue"]));
-      for (const q of order) {
-        await new Promise((ok) => setTimeout(ok, 750));
-        acc = { ...acc, [q.id]: target[q.id] };
+      for (const id of handledOrder(res, reqs)) {
+        await pause(750);
+        acc = { ...acc, [id]: target[id] };
         move(acc);
       }
-      await new Promise((ok) => setTimeout(ok, 950));
+      await pause(950);
       gsap.fromTo("[data-wall] [data-flip-id]", { x: -8 }, { x: 0, duration: 0.5, ease: "elastic.out(1.2,0.3)" });
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't run the Lab", "error");
@@ -100,6 +157,16 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
     try {
       const r = await ensureRun();
       const res = r.results.find((x) => x.solver !== "fcfs")!;
+      const found = res.trace.filter((e) => e.type === "incumbent").length;
+      // Replay the search: step through each better plan it found, then land the final one.
+      setMode("search");
+      setStep(0);
+      const gap = found > 1 ? Math.max(120, Math.min(600, SEARCH_MS / found)) : SEARCH_MS / 2;
+      for (let i = 1; i < found; i++) {
+        await pause(gap);
+        setStep(i);
+      }
+      await pause(gap);
       move(place(res));
       setMode("engine");
     } catch (e) {
@@ -112,6 +179,8 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
   const reset = () => {
     move(Object.fromEntries(reqs.map((q) => [q.id, "queue"])));
     setMode("idle");
+    setStep(-1);
+    setReplayed(null);
   };
 
   const apply = async () => {
@@ -126,6 +195,32 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
       setBusy(false);
     }
   };
+
+  const replay = async () => {
+    if (!run) return;
+    setBusy(true);
+    try {
+      const r = await api.lab.replay(run.runId);
+      const diff = r.comparison.changes.length;
+      setReplayed(diff);
+      if (diff === 0) toast("Replayed from the recorded snapshot: the same plan, room for room");
+      else toast(`Replay placed ${diff} request${diff === 1 ? "" : "s"} differently than the recording`, "error");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't replay this run", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Engine mode only: how a chip's outcome differs from FCFS. */
+  const changeNote = (id: string): string | undefined => {
+    if (mode !== "engine" || !fcfs || !engine) return undefined;
+    const before = fcfs.assignments.find((a) => a.requestId === id)?.roomId ?? null;
+    const after = engine.assignments.find((a) => a.requestId === id)?.roomId ?? null;
+    if (before === after || !after) return undefined;
+    return before ? `was ${codeOf(before)}` : "rescued";
+  };
+  const reasonOf = (id: string) => (mode === "engine" ? engine : fcfs)?.assignments.find((a) => a.requestId === id)?.reason;
 
   const shown = mode === "engine" ? engine : mode === "fcfs" ? fcfs : undefined;
   const slot = reqs[0]?.interval;
@@ -158,16 +253,26 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
           <div className="flex flex-wrap items-center gap-2">
             <Tag>{scenario.name}</Tag>
             {slot && <Tag>{fmtWhen(slot)}</Tag>}
-            <Tag className={cn(mode === "engine" && "bg-volt text-ink")}>
-              {mode === "idle" ? "Not placed yet" : mode === "fcfs" ? "First come, first served" : "Engine plan"}
+            <Tag className={cn((mode === "engine" || mode === "search") && "bg-volt text-ink")}>
+              {mode === "idle"
+                ? "Not placed yet"
+                : mode === "fcfs"
+                  ? "First come, first served"
+                  : mode === "search"
+                    ? "Engine searching…"
+                    : "Engine plan"}
             </Tag>
+            {mode === "engine" && replayed === 0 && <Tag>Replayed · identical</Tag>}
           </div>
           <div className="flex flex-wrap gap-2.5">
             <Button variant="outline" disabled={busy} onClick={playFcfs}>
               <Play /> Play FCFS
             </Button>
             <Button variant="volt" disabled={busy || mode === "idle"} onClick={runEngine}>
-              {busy ? <LoaderCircle className="animate-spin" /> : <Sparkles />} Run engine
+              {mode === "search" ? <LoaderCircle className="animate-spin" /> : <Sparkles />} Run engine
+            </Button>
+            <Button variant="outline" disabled={busy || mode !== "engine"} onClick={replay}>
+              <Repeat /> Replay
             </Button>
             <Button disabled={busy || mode !== "engine"} onClick={apply}>
               <Check /> Apply plan
@@ -178,10 +283,22 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
           </div>
         </div>
 
+        {(mode === "search" || mode === "engine") && engine && (
+          <SearchStrip
+            incumbents={incumbents}
+            step={mode === "engine" ? incumbents.length - 1 : step}
+            done={mode === "engine"}
+            result={engine}
+          />
+        )}
+
         <div ref={board} className="flex flex-col gap-6">
           <Lane label="Incoming, in the order they were sent" wide>
             {reqs.filter((q) => spots[q.id] === "queue").map((q) => <Chip key={q.id} q={q} />)}
           </Lane>
+          {rooms.length === 0 && (
+            <p className="font-mono text-[11px] tracking-[0.12em] text-fg-3 uppercase">Rooms appear as the solvers place requests</p>
+          )}
           <div className="flex flex-col gap-2.5">
             {rooms.map((room) => (
               <div key={room.id} className="grid grid-cols-[13rem_1fr] items-stretch gap-3 max-md:grid-cols-1">
@@ -197,7 +314,7 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
                 </div>
                 <div className="flex min-h-16 flex-wrap items-center gap-2 rounded-2xl border border-dashed border-white/12 px-3 py-2">
                   {reqs.filter((q) => spots[q.id] === room.id).map((q) => (
-                    <Chip key={q.id} q={q} room={room} />
+                    <Chip key={q.id} q={q} room={room} note={changeNote(q.id)} />
                   ))}
                 </div>
               </div>
@@ -206,7 +323,7 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
           <div data-wall className="flex min-h-18 flex-wrap items-center gap-3 rounded-2xl bg-[repeating-linear-gradient(135deg,rgb(229_72_77/0.14)_0_10px,transparent_10px_20px)] px-4 py-3 ring-1 ring-[#e5484d]/40">
             <span className="font-mono text-[11px] tracking-[0.14em] text-[#ffa9ab] uppercase">No room</span>
             {reqs.filter((q) => spots[q.id] === "wall").map((q) => (
-              <Chip key={q.id} q={q} stranded />
+              <Chip key={q.id} q={q} stranded reason={reasonOf(q.id)} />
             ))}
           </div>
         </div>
@@ -223,6 +340,40 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
   );
 }
 
+/** The engine's search, replayed: nodes explored and each better plan it found along the way. */
+function SearchStrip({ incumbents, step, done, result }: { incumbents: Incumbent[]; step: number; done: boolean; result: SolveResult }) {
+  const firstShown = Math.max(0, step + 1 - PLANS_SHOWN);
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl bg-white/[0.04] p-4 ring-1 ring-line md:flex-row md:items-center md:gap-8 md:px-6">
+      <div className="shrink-0">
+        <p className="eyebrow text-fg-3">{done ? "Engine searched" : "Engine searching"}</p>
+        <p className="figure text-[2.4rem] text-fg">
+          <AnimatedNumber value={result.metrics.nodes} duration={SEARCH_MS / 1000} />
+          <span className="ml-2 font-mono text-[12px] tracking-[0.12em] text-fg-3 uppercase">search steps</span>
+        </p>
+      </div>
+      <ol className="flex flex-wrap items-center gap-2" aria-live="polite">
+        {firstShown > 0 && <li className="font-mono text-[12px] text-fg-3">+{firstShown} earlier</li>}
+        {incumbents.slice(firstShown, step + 1).map((inc, i) => {
+          const index = firstShown + i;
+          const current = index === step;
+          return (
+            <li
+              key={index}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 font-mono text-[12px] ring-1",
+                current ? "bg-volt text-ink ring-volt" : "text-fg-2 ring-white/15",
+              )}
+            >
+              {index === 0 ? "First plan" : current && done ? "Best plan" : `Better plan ${index}`} · {inc.placed}/{result.metrics.total} placed
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function Lane({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
     <div className={cn("flex flex-col gap-3", wide && "rounded-2xl bg-white/[0.03] p-4 ring-1 ring-line")}>
@@ -232,11 +383,12 @@ function Lane({ label, children, wide }: { label: string; children: ReactNode; w
   );
 }
 
-function Chip({ q, room, stranded }: { q: EngineRequest; room?: Room; stranded?: boolean }) {
+function Chip({ q, room, stranded, note, reason }: { q: EngineRequest; room?: Room; stranded?: boolean; note?: string; reason?: string }) {
   const wasted = room ? room.capacity - q.headcount : null;
   return (
     <span
       data-flip-id={q.id}
+      title={stranded ? reason : undefined}
       className={cn(
         "inline-flex h-12 items-center gap-2.5 rounded-full py-1 pr-4 pl-1.5 text-[14px] font-medium",
         stranded ? "bg-[#e5484d] text-white" : room ? "bg-bone text-ink" : "bg-white/10 text-fg ring-1 ring-white/15",
@@ -248,6 +400,7 @@ function Chip({ q, room, stranded }: { q: EngineRequest; room?: Room; stranded?:
       {q.label ?? q.id}
       {q.features.length > 0 && <span className="text-[12px] opacity-60">· {q.features.join(", ")}</span>}
       {wasted !== null && <span className="font-mono text-[11px] opacity-55">{wasted} spare</span>}
+      {note && <span className="rounded-full bg-ink px-2 py-0.5 font-mono text-[10px] tracking-[0.08em] text-volt uppercase">{note}</span>}
     </span>
   );
 }

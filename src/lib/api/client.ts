@@ -18,7 +18,7 @@ import type {
   RoomInput,
   WeeklyInsight,
 } from "@/contracts";
-import type { AuditRow, DashboardFilters, DashboardMetrics, LabScenario, RequestRow } from "./types";
+import type { AuditRow, DashboardFilters, DashboardMetrics, LabReplayResponse, LabScenario, RequestRow } from "./types";
 
 export const DATA_EVENT = "allotiq:data";
 
@@ -128,6 +128,8 @@ export const api = {
     scenarios: () => get<LabScenario[]>("/api/lab/scenarios"),
     run: (scenarioId: string) => post<LabRunResponse>("/api/lab/run", { scenarioId, solvers: ["fcfs", "bnb"] }),
     apply: (runId: string) => post<{ ok: true }>("/api/lab/apply", { runId }),
+    /** Re-solve the recorded run with the engine alone; no changes = the plan is reproducible. */
+    replay: (runId: string) => post<LabReplayResponse>("/api/lab/replay", { runId, solvers: ["bnb"] }),
   },
   disruptions: {
     preview: (roomId: string, during: Interval, reason: string) =>

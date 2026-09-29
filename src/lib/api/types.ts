@@ -1,7 +1,7 @@
 // UI-facing response shapes that the frozen contracts leave open. Everything here is additive to
 // src/contracts — backend handlers can return exactly these (extra fields are fine). Owner: Nikhil
 import type { AuditEntry, BookingRequest, Building, Department, Profile, Room, RoomType } from "@/contracts/domain";
-import type { EngineRequest } from "@/contracts/engine";
+import type { EngineRequest, SolveResult, SolverName } from "@/contracts/engine";
 
 /** GET /api/requests, GET /api/approvals rows: the request plus who asked (for cards and queues). */
 export type RequestRow = BookingRequest & {
@@ -24,6 +24,19 @@ export interface LabScenario {
   roomIds?: string[];
   /** Scenarios may bring their own rooms (e.g. the brief's A/B/C fixture). */
   rooms?: Room[];
+}
+
+/** POST /api/lab/replay: re-solves a recorded Lab run from its stored snapshot and diffs it with the recording. */
+export interface LabReplayResponse {
+  runId: string;
+  baseline: SolveResult;
+  results: SolveResult[];
+  explanation: string;
+  comparison: {
+    baselineSolver: SolverName;
+    replaySolver: SolverName;
+    changes: { requestId: string; beforeRoomId: string | null; afterRoomId: string | null }[];
+  };
 }
 
 // ---------- Dashboard (GET /api/dashboard/{metric}) ----------
