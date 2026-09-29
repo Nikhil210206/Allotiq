@@ -1,5 +1,9 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// One room: edit, maintenance windows, check-in QR.
+import { RoomDetail } from "./room-detail";
 
-export default function Page() {
-  return <Placeholder title="Edit resource" owner="Aditi" task="D4" description="Room details + blackouts + printable QR" />;
+export const metadata = { title: "Room · Allotiq" };
+
+export default async function Page({ params }: PageProps<"/admin/resources/[id]">) {
+  const { id } = await params;
+  return <RoomDetail id={id} />;
 }

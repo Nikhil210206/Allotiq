@@ -38,9 +38,13 @@ waitlisted→ approved (auto-fill when a room frees up) | cancelled | expired
 ## Ownership
 | Area | Owner |
 |---|---|
-| `src/engine/**`, `src/server/engine-adapter.ts`, `src/lib/ai/**`, `app/admin/{lab,disruptions}`, lab/disruption/AI APIs | Aaditya |
-| `supabase/migrations`, `src/lib/{db,auth,clock,requests,jobs}`, `src/lib/notify.ts`, `src/hooks`, `src/proxy.ts`, login/join, approvals, check-in, resources, audit, demo controls, request/room/notification APIs | Aditi |
-| `src/components/**` (design kit), `app/r/**`, `app/availability`, `app/admin/dashboard`, `src/lib/analytics`, `scripts/seed` (catalog + history), CI, deploy | Nikhil |
+| `src/engine/**`, `src/server/engine-adapter.ts`, `src/lib/ai/**`, recommend/parse/lab/disruption/AI APIs | Aaditya |
+| `supabase/migrations`, `src/lib/{db,auth,clock,requests,jobs}`, `src/lib/notify.ts`, `src/proxy.ts`, request/room/approval/check-in/clock/demo/notification/audit APIs, Realtime wiring inside `src/hooks` | Aditi |
+| **All UI** — every page and layout in `src/app` (not `src/app/api`), `src/components/**`, `src/hooks/**` (polling today), `src/lib/api` (typed client), `src/lib/mock` (in-browser mock backend), `src/lib/seed` + `scripts/seed`, `src/lib/analytics`, CI, deploy | Nikhil |
+
+**Frontend ↔ backend:** screens only talk to `/api/*` through `src/lib/api/client.ts`. While an endpoint still returns
+`501 NOT_IMPLEMENTED`, the client answers from the mock backend (same contracts, same seeded catalog ids), so every
+screen works today. Implementing an endpoint switches the UI to real data with no UI change — match the contract types.
 
 Every stub file names its owner and task id (e.g. `Owner: Aditi · D5`). Unbuilt endpoints return `501 NOT_IMPLEMENTED` with the owner.
 

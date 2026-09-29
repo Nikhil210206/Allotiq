@@ -1,5 +1,17 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Sign in with demo role cards (?as=<persona> signs straight in).
+import { Suspense } from "react";
+import { Toaster } from "@/components/kit";
+import { Login } from "./login";
+
+export const metadata = { title: "Sign in · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="Sign in" owner="Aditi" task="D2" description="Email/password + demo role cards" />;
+  return (
+    <>
+      <Suspense>
+        <Login />
+      </Suspense>
+      <Toaster />
+    </>
+  );
 }

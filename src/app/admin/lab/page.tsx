@@ -1,5 +1,8 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Allocation Lab (demo scene 2).
+import { Lab } from "./lab";
+
+export const metadata = { title: "Allocation Lab · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="Allocation Lab" owner="Aaditya" task="A9" description="FCFS vs engine side by side + replay" />;
+  return <Lab />;
 }

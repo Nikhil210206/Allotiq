@@ -1,5 +1,8 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Audit log.
+import { AuditFeed } from "./audit-feed";
+
+export const metadata = { title: "Audit · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="Audit log" owner="Aditi" task="D13" description="Every state change, live" />;
+  return <AuditFeed />;
 }

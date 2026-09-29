@@ -1,5 +1,9 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Request status (N5).
+import { RequestStatusView } from "./request-status";
 
-export default function Page() {
-  return <Placeholder title="Request status" owner="Nikhil" task="N5" description="Live status stepper + audit timeline + offers" />;
+export const metadata = { title: "Request · Allotiq" };
+
+export default async function Page({ params }: PageProps<"/r/[id]">) {
+  const { id } = await params;
+  return <RequestStatusView id={id} />;
 }

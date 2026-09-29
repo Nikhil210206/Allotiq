@@ -1,5 +1,8 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Availability day grid (N6).
+import { Availability } from "./availability";
+
+export const metadata = { title: "Availability · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="Availability" owner="Nikhil" task="N6" description="Day grid: rooms × 30-min slots" />;
+  return <Availability />;
 }

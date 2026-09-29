@@ -1,5 +1,8 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Disruptions (demo scene 3).
+import { Disruptions } from "./disruptions";
+
+export const metadata = { title: "Disruptions · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="Disruptions" owner="Aaditya" task="A11" description="Mark a room unavailable → preview → apply rehome" />;
+  return <Disruptions />;
 }

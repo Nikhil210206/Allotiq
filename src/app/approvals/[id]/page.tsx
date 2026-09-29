@@ -1,5 +1,9 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Review one request (mobile-first).
+import { ApprovalReview } from "./approval-review";
 
-export default function Page() {
-  return <Placeholder title="Review request" owner="Aditi" task="D6" description="Approve / reject with reason (mobile-first)" />;
+export const metadata = { title: "Review · Allotiq" };
+
+export default async function Page({ params }: PageProps<"/approvals/[id]">) {
+  const { id } = await params;
+  return <ApprovalReview id={id} />;
 }

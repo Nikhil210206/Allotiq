@@ -1,5 +1,8 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// Resources: rooms list + add.
+import { Resources } from "./resources";
+
+export const metadata = { title: "Resources · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="Resources" owner="Aditi" task="D4" description="Register rooms, features, hours, access, blackouts" />;
+  return <Resources />;
 }

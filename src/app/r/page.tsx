@@ -1,5 +1,8 @@
-import { Placeholder } from "@/components/kit/placeholder";
+// My bookings (N5).
+import { MyBookings } from "./my-bookings";
+
+export const metadata = { title: "My bookings · Allotiq" };
 
 export default function Page() {
-  return <Placeholder title="My bookings" owner="Nikhil" task="N5" description="My requests and their live status" />;
+  return <MyBookings />;
 }
