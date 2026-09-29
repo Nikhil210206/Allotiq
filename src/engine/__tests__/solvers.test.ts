@@ -108,6 +108,39 @@ describe("Greedy Solver", () => {
 });
 
 describe("Branch & Bound Solver", () => {
+  it("places mustPlace requests ahead of higher-priority conflicts", () => {
+    const ctx: EngineContext = { ...baseCtx, rooms: [makeRoom("ONLY", 100)] };
+    const reqs = [makeReq("A", 50, 50), makeReq("B", 50, 20)];
+
+    const res = bnbSolver.solve(reqs, ctx, { mustPlace: ["B"] });
+
+    expect(res.assignments.find((a) => a.requestId === "B")?.roomId).toBe("ONLY");
+    expect(res.assignments.find((a) => a.requestId === "A")?.roomId).toBeNull();
+  });
+
+  it("keeps a meaningful reason when a mustPlace request has no feasible room", () => {
+    const ctx: EngineContext = { ...baseCtx, rooms: [makeRoom("SMALL", 20)] };
+    const res = bnbSolver.solve([makeReq("required", 50)], ctx, { mustPlace: ["required"] });
+    expect(res.assignments[0].roomId).toBeNull();
+    expect(res.assignments[0].reason).toMatch(/no feasible room/i);
+  });
+
+  it("handles 14 requests across 12 rooms within the timeout and deterministically", () => {
+    const rooms = Array.from({ length: 12 }, (_, i) => makeRoom(`R${String(i).padStart(2, "0")}`, 100));
+    const reqs = Array.from({ length: 14 }, (_, i) =>
+      makeReq(`Q${String(i).padStart(2, "0")}`, 50, 20 + (i % 3), `2026-09-29T10:${String(i).padStart(2, "0")}:00+05:30`),
+    );
+    const ctx: EngineContext = { ...baseCtx, rooms };
+
+    const first = bnbSolver.solve(reqs, ctx, { timeoutMs: 1500 });
+    const second = bnbSolver.solve(reqs, ctx, { timeoutMs: 1500 });
+
+    expect(first.timedOut).toBe(false);
+    expect(first.metrics.placed).toBe(12);
+    expect(first.assignments).toEqual(second.assignments);
+    expect(first.trace.length).toBeLessThan(100);
+  });
+
   it("finds globally optimal placement across conflicting requests", () => {
     const roomA = makeRoom("A", 120, ["projector"]);
     const roomB = makeRoom("B", 60, ["projector"]);

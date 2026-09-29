@@ -1,5 +1,6 @@
 // Placed, priority placed, seats wasted, buildings active. Owner: Aaditya · A3
 import type { Assignment, EngineContext, EngineRequest, SolveMetrics } from "@/contracts/engine";
+import { PRIORITY_THRESHOLD } from "@/contracts/domain";
 
 export function computeMetrics(
   assignments: Assignment[],
@@ -23,7 +24,7 @@ export function computeMetrics(
   const activeBuildings = new Set<string>();
 
   for (const req of reqs) {
-    if (req.priority >= 40) {
+    if (req.priority >= PRIORITY_THRESHOLD) {
       priorityTotal++;
     }
   }
@@ -32,7 +33,7 @@ export function computeMetrics(
     if (a.roomId) {
       placed++;
       const req = reqMap.get(a.requestId);
-      if (req && req.priority >= 40) {
+      if (req && req.priority >= PRIORITY_THRESHOLD) {
         priorityPlaced++;
       }
       const room = roomMap.get(a.roomId);

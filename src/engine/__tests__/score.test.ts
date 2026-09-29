@@ -148,19 +148,18 @@ describe("proximity", () => {
     expect(score.proximity).toBe(0.5);
   });
 
-  it("calculates haversine decay with coordinates", () => {
+  it("uses the 1500-meter linear proximity scale", () => {
     const score = scoreRoom(
       makeRoom({ buildingId: "B2" }),
       makeReq({ preferredBuildingId: "B1" }),
       makeCtx({
         buildings: [
-          { id: "B1", lat: 12.9716, lng: 77.5946 },
-          { id: "B2", lat: 12.9726, lng: 77.5956 },
+          { id: "B1", lat: 0, lng: 0 },
+          { id: "B2", lat: 0, lng: 0.006745 },
         ],
       }),
     );
-    expect(score.proximity).toBeGreaterThan(0);
-    expect(score.proximity).toBeLessThan(1);
+    expect(score.proximity).toBeCloseTo(0.5, 1);
   });
 
   it("no preference and no dept → neutral 0.5", () => {
@@ -172,48 +171,17 @@ describe("proximity", () => {
 // ── Scarcity ────────────────────────────────────────────────────
 
 describe("scarcity", () => {
-  it("no overlapping bookings → 1.0", () => {
-    const score = scoreRoom(makeRoom({ booked: [] }), makeReq(), makeCtx());
-    expect(score.scarcity).toBe(1);
-  });
+  it("uses room rarity and oversize rather than occupancy count", () => {
+    const snug = makeRoom({ id: "SNUG", capacity: 70 });
+    const auditorium = makeRoom({ id: "AUD", capacity: 500 });
+    const ctx = makeCtx({ rooms: [snug, auditorium] });
+    const req = makeReq({ headcount: 60 });
+    const snugScore = scoreRoom(snug, req, ctx);
+    const auditoriumScore = scoreRoom(auditorium, req, ctx);
 
-  it("1 overlapping booking → 0.5", () => {
-    const room = makeRoom({
-      booked: [
-        {
-          requestId: "REQ_EXISTING_1",
-          interval: { start: THU_4PM, end: THU_6PM },
-          priority: 10,
-          status: "approved",
-          movable: true,
-        },
-      ],
-    });
-    const score = scoreRoom(room, makeReq(), makeCtx());
-    expect(score.scarcity).toBe(0.5);
-  });
-
-  it("2 overlapping bookings → 0.333...", () => {
-    const room = makeRoom({
-      booked: [
-        {
-          requestId: "REQ_EXISTING_1",
-          interval: { start: THU_4PM, end: THU_6PM },
-          priority: 10,
-          status: "approved",
-          movable: true,
-        },
-        {
-          requestId: "REQ_EXISTING_2",
-          interval: { start: THU_4PM, end: THU_6PM },
-          priority: 10,
-          status: "approved",
-          movable: true,
-        },
-      ],
-    });
-    const score = scoreRoom(room, makeReq(), makeCtx());
-    expect(score.scarcity).toBeCloseTo(1 / 3, 3);
+    expect(snugScore.scarcity).toBeCloseTo(1 - (1 / 2) * (10 / 70), 5);
+    expect(auditoriumScore.scarcity).toBeCloseTo(1 - (1 / 1) * (440 / 500), 5);
+    expect(snugScore.total).toBeGreaterThan(auditoriumScore.total);
   });
 });
 
@@ -225,14 +193,14 @@ describe("preference", () => {
     expect(score.preference).toBe(0);
   });
 
-  it("1 past booking → 0.5", () => {
-    const score = scoreRoom(makeRoom({ id: "R1" }), makeReq({ history: { R1: 1 } }), makeCtx());
+  it("normalizes a room history count against the maximum", () => {
+    const score = scoreRoom(makeRoom({ id: "R1" }), makeReq({ history: { R1: 1, R2: 2 } }), makeCtx());
     expect(score.preference).toBe(0.5);
   });
 
-  it("2 past bookings → 0.666...", () => {
+  it("the room with maximum history scores 1", () => {
     const score = scoreRoom(makeRoom({ id: "R1" }), makeReq({ history: { R1: 2 } }), makeCtx());
-    expect(score.preference).toBeCloseTo(2 / 3, 3);
+    expect(score.preference).toBe(1);
   });
 });
 
@@ -348,8 +316,8 @@ describe("metrics — priority threshold = 40", () => {
   });
 });
 
-describe("scarcityScore — active-status filter", () => {
-  it("inactive overlapping booking does NOT reduce scarcity (score = 1)", () => {
+describe("scarcityScore — rarity and oversize", () => {
+  it("inactive bookings do not affect the room-size formula", () => {
     const room = makeRoom({
       booked: [{
         requestId: "old",
@@ -362,11 +330,11 @@ describe("scarcityScore — active-status filter", () => {
     const req = makeReq({ interval: SLOT });
     const ctx = makeCtx({ rooms: [room] });
     const score = scoreRoom(room, req, ctx);
-    // scarcity should be 1/(1+0) = 1 because "cancelled" is not active
-    expect(score.scarcity).toBeCloseTo(1, 5);
+    // One 100-seat room and a 50-person request gives rarity=1, oversize=0.5.
+    expect(score.scarcity).toBeCloseTo(0.5, 5);
   });
 
-  it("active overlapping booking DOES reduce scarcity (score < 1)", () => {
+  it("active bookings do not affect the room-size formula", () => {
     const room = makeRoom({
       booked: [{
         requestId: "active",
@@ -379,7 +347,6 @@ describe("scarcityScore — active-status filter", () => {
     const req = makeReq({ interval: SLOT });
     const ctx = makeCtx({ rooms: [room] });
     const score = scoreRoom(room, req, ctx);
-    // scarcity should be 1/(1+1) = 0.5
     expect(score.scarcity).toBeCloseTo(0.5, 5);
   });
 });
@@ -423,5 +390,17 @@ describe("energyScore — active-status filter", () => {
     const req = makeReq({ interval: SLOT });
     const score = scoreRoom(room, req, ctx);
     expect(score.energy).toBe(1);
+  });
+});
+
+describe("user-facing score notes", () => {
+  it("does not expose department UUIDs", () => {
+    const departmentId = "123e4567-e89b-12d3-a456-426614174000";
+    const room = makeRoom({ buildingId: "B1" });
+    const req = makeReq({ deptId: departmentId });
+    const score = scoreRoom(room, req, makeCtx({ rooms: [room], deptBuilding: { [departmentId]: "B1" } }));
+
+    expect(score.notes).toContain("Same building as your department");
+    expect(score.notes.join(" ")).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   });
 });

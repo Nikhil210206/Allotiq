@@ -98,9 +98,9 @@ describe("FEATURE", () => {
   });
 
   it("required feature missing → FEATURE violation", () => {
-    expect(
-      codes(makeRoom({ features: ["mic"] }), makeReq({ features: ["projector"] })),
-    ).toContain("FEATURE");
+    const violations = hardViolations(makeRoom({ features: ["mic"] }), makeReq({ features: ["smart_board"] }), ctx);
+    expect(violations.map((v) => v.code)).toContain("FEATURE");
+    expect(violations.find((v) => v.code === "FEATURE")?.message).toBe("No smart board");
   });
 
   it("multiple missing features → one violation per missing feature", () => {
@@ -144,9 +144,12 @@ describe("ACCESS", () => {
   });
 
   it("dept_only, different dept → ACCESS violation", () => {
-    expect(
-      codes(makeRoom({ access: "dept_only", deptId: "CS" }), makeReq({ deptId: "EE" })),
-    ).toContain("ACCESS");
+    const violations = hardViolations(
+      makeRoom({ access: "dept_only", deptId: "123e4567-e89b-12d3-a456-426614174000" }),
+      makeReq({ deptId: "223e4567-e89b-12d3-a456-426614174000" }),
+      ctx,
+    );
+    expect(violations.find((v) => v.code === "ACCESS")?.message).toBe("Only for its own department");
   });
 
   it("dept_only, requester has no dept → ACCESS violation", () => {
@@ -220,22 +223,19 @@ describe("OVERLAP", () => {
   });
 
   it("overlapping active booking → OVERLAP violation", () => {
-    expect(
-      codes(
-        makeRoom({
-          booked: [
-            {
-              requestId: "OTHER",
-              interval: { start: THU_4PM, end: THU_6PM },
-              priority: 20,
-              status: "approved",
-              movable: true,
-            },
-          ],
-        }),
-        makeReq(),
-      ),
-    ).toContain("OVERLAP");
+    const violations = hardViolations(
+      makeRoom({ booked: [{
+        requestId: "123e4567-e89b-12d3-a456-426614174000",
+        interval: { start: THU_4PM, end: THU_6PM },
+        priority: 20,
+        status: "approved",
+        movable: true,
+      }] }),
+      makeReq(),
+      ctx,
+    );
+    expect(violations.find((v) => v.code === "OVERLAP")?.message).toBe("Booked 16:00–18:00");
+    expect(violations.map((v) => v.message).join(" ")).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   });
 
   it("touching booking (back-to-back) → no violation", () => {

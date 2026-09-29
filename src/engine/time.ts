@@ -2,6 +2,17 @@
 import type { Interval } from "@/contracts/domain";
 import { TZ } from "@/contracts/domain";
 
+const wallClockFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: TZ,
+  hour: "numeric",
+  minute: "numeric",
+  hourCycle: "h23",
+  weekday: "short",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 /** a.start < b.end && b.start < a.end — so 16:00–18:00 and 18:00–20:00 do not overlap. */
 export function overlaps(a: Interval, b: Interval): boolean {
   return Date.parse(a.start) < Date.parse(b.end) && Date.parse(b.start) < Date.parse(a.end);
@@ -25,17 +36,7 @@ function parseHM(hm: string): number {
  */
 function wallClock(iso: string): { hours: number; minutes: number; weekday: number; dateKey: string } {
   const ms = Date.parse(iso);
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ,
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false,
-    weekday: "short",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = fmt.formatToParts(ms);
+  const parts = wallClockFormatter.formatToParts(ms);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
 
   const hours = parseInt(get("hour"), 10);
