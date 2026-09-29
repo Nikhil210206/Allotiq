@@ -3,21 +3,7 @@
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
-import type { AuditEntry } from "@/contracts/domain";
-
-function rowToAudit(r: Record<string, unknown>): AuditEntry {
-  return {
-    id: r.id as number,
-    at: r.at as string,
-    actorId: (r.actor_id as string) ?? null,
-    entity: r.entity as AuditEntry["entity"],
-    entityId: r.entity_id as string,
-    action: r.action as string,
-    fromStatus: (r.from_status as AuditEntry["fromStatus"]) ?? null,
-    toStatus: (r.to_status as AuditEntry["toStatus"]) ?? null,
-    details: (r.details as Record<string, unknown>) ?? {},
-  };
-}
+import { rowToAudit } from "@/lib/db/mappers";
 
 export async function GET(req: Request) {
   try {

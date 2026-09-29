@@ -1,55 +1,31 @@
 "use client";
-// Live status of one request. Realtime subscription + 4s polling fallback.
-// Owner: Aditi · D7
-import { useEffect, useRef, useState, useCallback } from "react";
+// Live status of one request. Polls every 4s and re-fetches on any Realtime change to that row.
+// Owner: Nikhil (UI) · Aditi (Realtime)
+import { useEffect } from "react";
 import { api } from "@/lib/api/client";
 import { browserDb } from "@/lib/db/browser";
-import type { RequestDetail } from "@/contracts/api";
+import { useApi } from "./use-api";
 
 export function useRequestLive(id: string) {
-  const [data, setData] = useState<RequestDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const pollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const refresh = useCallback(async () => {
-    try {
-      const res = await api.requests.get(id);
-      setData(res as RequestDetail);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load request");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const result = useApi(`request:${id}`, () => api.requests.get(id), { refreshMs: 4000 });
+  const { reload } = result;
 
   useEffect(() => {
-    void refresh();
-
+    // No Supabase env (e.g. UI-only local dev): skip Realtime, the poll above still keeps it fresh.
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return;
     const supabase = browserDb();
     const channel = supabase
       .channel(`request-live-${id}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "requests", filter: `id=eq.${id}` },
-        () => void refresh(),
+        () => void reload(),
       )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (!pollerRef.current) {
-            pollerRef.current = setInterval(() => void refresh(), 4000);
-          }
-        }
-      });
-
-    pollerRef.current = setInterval(() => void refresh(), 4000);
-
+      .subscribe();
     return () => {
       void supabase.removeChannel(channel);
-      if (pollerRef.current) clearInterval(pollerRef.current);
     };
-  }, [id, refresh]);
+  }, [id, reload]);
 
-  return { data, loading, error, refresh };
+  return result;
 }

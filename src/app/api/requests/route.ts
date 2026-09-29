@@ -4,39 +4,10 @@
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
+import { rowToRequest } from "@/lib/db/mappers";
 import { getNow } from "@/lib/clock";
 import { CreateRequestSchema } from "@/contracts/api";
 import { PURPOSE_PRIORITY, TIMING } from "@/contracts/domain";
-import type { BookingRequest, Feature } from "@/contracts/domain";
-
-function rowToRequest(r: Record<string, unknown>): BookingRequest {
-  const dur = r.during as string;
-  const clean = dur.replace(/^[\[(]|[\])]$/g, "");
-  const [start, end] = clean.split(",").map((s) => s.replace(/^"|"$/g, "").trim());
-  return {
-    id: r.id as string,
-    requesterId: r.requester_id as string,
-    title: r.title as string,
-    purpose: r.purpose as BookingRequest["purpose"],
-    priority: r.priority as number,
-    headcount: r.headcount as number,
-    minSystems: (r.min_systems as number) ?? 0,
-    requiredFeatures: (r.required_features as Feature[]) ?? [],
-    roomType: (r.room_type as BookingRequest["roomType"]) ?? null,
-    preferredBuildingId: (r.preferred_building_id as string) ?? null,
-    during: { start, end },
-    roomId: (r.room_id as string) ?? null,
-    status: r.status as BookingRequest["status"],
-    holdExpiresAt: (r.hold_expires_at as string) ?? null,
-    checkedInAt: (r.checked_in_at as string) ?? null,
-    decisionReason: (r.decision_reason as string) ?? null,
-    unplacedReason: (r.unplaced_reason as string) ?? null,
-    offeredAlternatives: (r.offered_alternatives as unknown) ?? null,
-    scoreBreakdown: (r.score_breakdown as unknown) ?? null,
-    source: (r.source as BookingRequest["source"]) ?? "form",
-    createdAt: r.created_at as string,
-  };
-}
 
 export async function GET(req: Request) {
   let actor;
@@ -113,7 +84,7 @@ export async function POST(req: Request) {
       required_features: draft.requiredFeatures,
       room_type: draft.roomType ?? null,
       preferred_building_id: draft.preferredBuildingId ?? null,
-      during: roomId ? `[${draft.during.start},${draft.during.end})` : `[${draft.during.start},${draft.during.end})`,
+      during: `[${draft.during.start},${draft.during.end})`,
       room_id: roomId ?? null,
       status,
       hold_expires_at: roomId ? holdExpiresAt : null,

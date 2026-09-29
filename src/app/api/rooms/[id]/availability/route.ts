@@ -4,6 +4,7 @@
 import { getSessionUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
+import { parseRange } from "@/lib/db/mappers";
 import type { AvailabilitySlot } from "@/contracts/api";
 import { TZ } from "@/contracts/domain";
 
@@ -30,24 +31,27 @@ export async function GET(
     .single();
   if (roomErr || !room) return apiError(404, "NOT_FOUND", "Room not found.");
 
-  // Day boundary in IST → UTC
+  // The IST calendar day as a half-open range; Postgres does the overlap test on the `during` range column.
   const dayStart = new Date(`${date}T00:00:00+05:30`);
-  const dayEnd = new Date(`${date}T23:59:59+05:30`);
+  if (Number.isNaN(dayStart.getTime())) return apiError(400, "BAD_REQUEST", "date is not a valid calendar date");
+  const day = `[${dayStart.toISOString()},${new Date(dayStart.getTime() + 24 * 60 * 60_000).toISOString()})`;
 
-  // Fetch active bookings for this room on this date
-  const { data: bookings } = await supabase
+  // Active bookings for this room that touch the day
+  const { data: bookings, error: bookingsErr } = await supabase
     .from("requests")
     .select("id, during, status, title")
     .eq("room_id", id)
     .in("status", ["pending", "approved", "checked_in"])
-    .gte("during->>0", dayStart.toISOString().slice(0, 10))  // rough pre-filter
-    .lte("during->>1", dayEnd.toISOString());
+    .filter("during", "ov", day);
+  if (bookingsErr) return apiError(500, "DB_ERROR", bookingsErr.message);
 
-  // Fetch blackouts for this room on this date
-  const { data: blackouts } = await supabase
+  // Blackouts that touch the day
+  const { data: blackouts, error: blackoutsErr } = await supabase
     .from("room_blackouts")
     .select("during, reason")
-    .eq("room_id", id);
+    .eq("room_id", id)
+    .filter("during", "ov", day);
+  if (blackoutsErr) return apiError(500, "DB_ERROR", blackoutsErr.message);
 
   // Determine the ISO weekday for the date (1=Mon … 7=Sun)
   const dayOfWeek = new Date(`${date}T12:00:00+05:30`).toLocaleDateString("en-US", {
@@ -75,10 +79,8 @@ export async function GET(
 
     // Check blackouts
     for (const b of blackouts ?? []) {
-      const [bs, be] = (b.during as string).replace(/["[\]]/g, "").split(",");
-      const bStart = new Date(bs);
-      const bEnd = new Date(be);
-      if (slotStart < bEnd && slotEnd > bStart) {
+      const { start: bs, end: be } = parseRange(b.during);
+      if (slotStart < new Date(be) && slotEnd > new Date(bs)) {
         state = "blackout";
         label = (b as Record<string, unknown>).reason as string;
         break;
@@ -88,11 +90,8 @@ export async function GET(
     // Check bookings (overrides blackout label but not the blackout itself for actives)
     if (state !== "blackout") {
       for (const bk of bookings ?? []) {
-        const dur = bk.during as string;
-        const [bs, be] = dur.replace(/["[\]]/g, "").split(",");
-        const bStart = new Date(bs);
-        const bEnd = new Date(be);
-        if (slotStart < bEnd && slotEnd > bStart) {
+        const { start: bs, end: be } = parseRange(bk.during);
+        if (slotStart < new Date(be) && slotEnd > new Date(bs)) {
           state = bk.status === "pending" ? "held" : "booked";
           requestId = bk.id as string;
           label = bk.title as string;

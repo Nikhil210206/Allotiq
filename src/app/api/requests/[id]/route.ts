@@ -3,72 +3,9 @@
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
-import type { BookingRequest, AuditEntry, Room, Feature } from "@/contracts/domain";
+import { rowToAudit, rowToRequest, rowToRoom } from "@/lib/db/mappers";
+import type { Room } from "@/contracts/domain";
 import type { RequestDetail } from "@/contracts/api";
-
-function rowToRequest(r: Record<string, unknown>): BookingRequest {
-  const dur = r.during as string;
-  const clean = dur.replace(/^[\[(]|[\])]$/g, "");
-  const [start, end] = clean.split(",").map((s) => s.replace(/^"|"$/g, "").trim());
-  return {
-    id: r.id as string,
-    requesterId: r.requester_id as string,
-    title: r.title as string,
-    purpose: r.purpose as BookingRequest["purpose"],
-    priority: r.priority as number,
-    headcount: r.headcount as number,
-    minSystems: (r.min_systems as number) ?? 0,
-    requiredFeatures: (r.required_features as Feature[]) ?? [],
-    roomType: (r.room_type as BookingRequest["roomType"]) ?? null,
-    preferredBuildingId: (r.preferred_building_id as string) ?? null,
-    during: { start, end },
-    roomId: (r.room_id as string) ?? null,
-    status: r.status as BookingRequest["status"],
-    holdExpiresAt: (r.hold_expires_at as string) ?? null,
-    checkedInAt: (r.checked_in_at as string) ?? null,
-    decisionReason: (r.decision_reason as string) ?? null,
-    unplacedReason: (r.unplaced_reason as string) ?? null,
-    offeredAlternatives: (r.offered_alternatives as unknown) ?? null,
-    scoreBreakdown: (r.score_breakdown as unknown) ?? null,
-    source: (r.source as BookingRequest["source"]) ?? "form",
-    createdAt: r.created_at as string,
-  };
-}
-
-function rowToAudit(r: Record<string, unknown>): AuditEntry {
-  return {
-    id: r.id as number,
-    at: r.at as string,
-    actorId: (r.actor_id as string) ?? null,
-    entity: r.entity as AuditEntry["entity"],
-    entityId: r.entity_id as string,
-    action: r.action as string,
-    fromStatus: (r.from_status as AuditEntry["fromStatus"]) ?? null,
-    toStatus: (r.to_status as AuditEntry["toStatus"]) ?? null,
-    details: (r.details as Record<string, unknown>) ?? {},
-  };
-}
-
-function rowToRoom(r: Record<string, unknown>): Room {
-  return {
-    id: r.id as string,
-    code: r.code as string,
-    name: r.name as string,
-    buildingId: r.building_id as string,
-    type: r.type as Room["type"],
-    capacity: r.capacity as number,
-    systemsCount: (r.systems_count as number) ?? 0,
-    features: (r.features as Feature[]) ?? [],
-    departmentId: (r.department_id as string) ?? null,
-    access: r.access as Room["access"],
-    approverId: (r.approver_id as string) ?? null,
-    openTime: r.open_time as string,
-    closeTime: r.close_time as string,
-    openDays: (r.open_days as number[]) ?? [],
-    attributes: (r.attributes as Record<string, unknown>) ?? {},
-    isActive: r.is_active as boolean,
-  };
-}
 
 export async function GET(
   _req: Request,

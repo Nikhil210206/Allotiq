@@ -4,22 +4,9 @@
 import { requireRole, getSessionUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
+import { rowToBlackout } from "@/lib/db/mappers";
 import { BlackoutInputSchema } from "@/contracts/api";
 import { getNow } from "@/lib/clock";
-import type { Blackout } from "@/contracts/domain";
-
-function rowToBlackout(r: Record<string, unknown>): Blackout {
-  const during = r.during as string;
-  // tstzrange format: ["start","end") — strip brackets and quotes
-  const clean = during.replace(/^[\[(]|[\])]$/g, "");
-  const [start, end] = clean.split(",").map((s) => s.replace(/^"|"$/g, "").trim());
-  return {
-    id: r.id as string,
-    roomId: r.room_id as string,
-    during: { start, end },
-    reason: r.reason as string,
-  };
-}
 
 export async function GET(
   _req: Request,

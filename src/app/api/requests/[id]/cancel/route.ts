@@ -1,4 +1,4 @@
-// POST /api/requests/[id]/cancel — Requester cancels their own request.
+// POST /api/requests/[id]/cancel — Requester cancels their own request (admins can cancel any).
 // Owner: Aditi · Task D5
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
@@ -19,17 +19,16 @@ export async function POST(
 
   const { id } = await params;
   const supabase = db();
-  const { data: req, error } = await supabase
+  const { data: r, error } = await supabase
     .from("requests")
-    .select("id, requester_id, status, title, room_id, approver_id:rooms(approver_id)")
+    .select("id, requester_id, status, title, room_id")
     .eq("id", id)
     .single();
 
-  if (error || !req) return apiError(404, "NOT_FOUND", "Request not found.");
+  if (error || !r) return apiError(404, "NOT_FOUND", "Request not found.");
 
-  const r = req as Record<string, unknown>;
-  // Only the requester or an admin can cancel
-  if (actor.role === "requester" && r.requester_id !== actor.id)
+  // Only the requester or an admin can cancel — approvers decide, they don't cancel other people's bookings.
+  if (actor.role !== "admin" && r.requester_id !== actor.id)
     return apiError(403, "FORBIDDEN", "Not your request.");
 
   try {
@@ -38,15 +37,16 @@ export async function POST(
     return apiError(409, "TRANSITION_ERROR", (e as Error).message);
   }
 
-  // Notify approver if request was pending
-  const approverRooms = r.approver_id as Array<{ approver_id: string | null }> | null;
-  const approverId = approverRooms?.[0]?.approver_id;
-  if (approverId) {
-    await notify(approverId, {
-      kind: "cancelled",
-      title: `"${r.title}" was cancelled`,
-      requestId: id,
-    }).catch(() => {});
+  // Tell the room's approver when a request still waiting on them is withdrawn.
+  if (r.status === "pending" && r.room_id) {
+    const { data: room } = await supabase.from("rooms").select("approver_id").eq("id", r.room_id).maybeSingle();
+    if (room?.approver_id && room.approver_id !== actor.id) {
+      await notify(room.approver_id, {
+        kind: "cancelled",
+        title: `"${r.title}" was cancelled`,
+        requestId: id,
+      });
+    }
   }
 
   return Response.json({ ok: true });

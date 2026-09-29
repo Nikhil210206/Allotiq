@@ -3,6 +3,7 @@
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
+import { parseRange } from "@/lib/db/mappers";
 import { getNow } from "@/lib/clock";
 import { transition } from "@/lib/requests/transition";
 import { notify } from "@/lib/notify";
@@ -52,9 +53,7 @@ export async function POST(req: Request) {
 
   let targetRequest: Record<string, unknown> | null = null;
   for (const r of requests ?? []) {
-    const dur = r.during as string;
-    const clean = dur.replace(/^[\[(]|[\])]$/g, "");
-    const [start] = clean.split(",").map((s: string) => s.replace(/^"|"$/g, "").trim());
+    const { start } = parseRange(r.during);
     const startMs = Date.parse(start);
 
     // Window: [start - 10min, start + 15min]

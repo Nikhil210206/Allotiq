@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 import { db } from "@/lib/db/server";
 
 export async function getNow(): Promise<string> {

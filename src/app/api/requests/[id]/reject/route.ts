@@ -3,6 +3,7 @@
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
+import { canDecide } from "@/lib/requests/access";
 import { transition } from "@/lib/requests/transition";
 import { notify } from "@/lib/notify";
 import { RejectSchema } from "@/contracts/api";
@@ -25,14 +26,17 @@ export async function POST(
     return apiError(400, "BAD_REQUEST", parsed.error.issues[0]?.message ?? "reason is required");
 
   const supabase = db();
-  const { data: reqData, error } = await supabase
+  const { data: r, error } = await supabase
     .from("requests")
     .select("id, requester_id, status, title, room_id")
     .eq("id", id)
     .single();
 
-  if (error || !reqData) return apiError(404, "NOT_FOUND", "Request not found.");
-  const r = reqData as Record<string, unknown>;
+  if (error || !r) return apiError(404, "NOT_FOUND", "Request not found.");
+
+  // Approvers can only decide requests for rooms they manage
+  if (!(await canDecide(supabase, actor, r.room_id)))
+    return apiError(403, "FORBIDDEN", "Not your room.");
 
   try {
     await transition(id, "rejected", {
@@ -46,12 +50,12 @@ export async function POST(
     return apiError(409, "TRANSITION_ERROR", (e as Error).message);
   }
 
-  await notify(r.requester_id as string, {
+  await notify(r.requester_id, {
     kind: "rejected",
     title: `"${r.title}" rejected`,
     body: parsed.data.reason,
     requestId: id,
-  }).catch(() => {});
+  });
 
   return Response.json({ ok: true });
 }

@@ -4,29 +4,8 @@
 import { requireRole, getSessionUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
+import { rowToRoom } from "@/lib/db/mappers";
 import { RoomInputSchema } from "@/contracts/api";
-import type { Feature, Room } from "@/contracts/domain";
-
-function rowToRoom(r: Record<string, unknown>): Room {
-  return {
-    id: r.id as string,
-    code: r.code as string,
-    name: r.name as string,
-    buildingId: r.building_id as string,
-    type: r.type as Room["type"],
-    capacity: r.capacity as number,
-    systemsCount: (r.systems_count as number) ?? 0,
-    features: (r.features as Feature[]) ?? [],
-    departmentId: (r.department_id as string) ?? null,
-    access: r.access as Room["access"],
-    approverId: (r.approver_id as string) ?? null,
-    openTime: r.open_time as string,
-    closeTime: r.close_time as string,
-    openDays: (r.open_days as number[]) ?? [],
-    attributes: (r.attributes as Record<string, unknown>) ?? {},
-    isActive: r.is_active as boolean,
-  };
-}
 
 export async function GET(
   _req: Request,

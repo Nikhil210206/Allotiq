@@ -23,6 +23,10 @@ const PERSONA_REDIRECT: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
+  // Anyone who can call this becomes any persona, admin included — so it is off in production unless DEMO_MODE=1.
+  if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "1")
+    return apiError(403, "DEMO_DISABLED", "Demo sign-in is disabled. Set DEMO_MODE=1 to enable it.");
+
   const body = await req.json().catch(() => ({}));
   const parsed = DemoLoginSchema.safeParse(body);
   if (!parsed.success)
