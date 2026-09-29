@@ -72,6 +72,7 @@ export async function POST(req: Request) {
   try {
     await transition(targetRequest.id as string, "checked_in", {
       actorId: actor.id,
+      expectedStatus: "approved",
       action: "checkin",
       patch: { checked_in_at: now },
     });

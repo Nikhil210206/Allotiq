@@ -6,7 +6,7 @@ import { apiError } from "@/lib/http";
 import { transition } from "@/lib/requests/transition";
 import { getNow } from "@/lib/clock";
 import { AcceptOfferSchema } from "@/contracts/api";
-import { PURPOSE_PRIORITY, TIMING } from "@/contracts/domain";
+import { PURPOSE_PRIORITY, TIMING, type RequestStatus } from "@/contracts/domain";
 
 export async function POST(
   req: Request,
@@ -49,6 +49,7 @@ export async function POST(
   try {
     await transition(id, "pending", {
       actorId: actor.id,
+      expectedStatus: r.status as RequestStatus,
       action: "accept_offer",
       patch: {
         room_id: parsed.data.roomId,

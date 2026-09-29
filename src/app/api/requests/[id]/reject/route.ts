@@ -41,6 +41,7 @@ export async function POST(
   try {
     await transition(id, "rejected", {
       actorId: actor.id,
+      expectedStatus: "pending",
       action: "reject",
       note: parsed.data.reason,
       // Clear the room assignment on rejection (room_id must be null for terminal statuses per schema)
