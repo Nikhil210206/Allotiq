@@ -9,7 +9,7 @@ export async function notify(
   n: { kind: string; title: string; body?: string; requestId?: string },
 ): Promise<void> {
   const supabase = db();
-  const now = (await getNow()).toISOString();
+  const now = await getNow();
   const { error } = await supabase.from("notifications").insert({
     user_id: userId,
     kind: n.kind,

@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/auth/session";
 import { advanceClock, getClockState, setClockOffset } from "@/lib/clock";
 import { apiError } from "@/lib/http";
 import { ClockSchema } from "@/contracts/api";
-import { runTick } from "@/lib/jobs/tick";
+import { runTick, type TickResult } from "@/lib/jobs/tick";
 
 export async function POST(req: Request) {
   try {
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   }
 
   // A failing tick must not undo or hide the clock change.
-  let tick: Awaited<ReturnType<typeof runTick>> | null = null;
+  let tick: TickResult | null = null;
   try {
     tick = await runTick();
   } catch (e) {
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
   try {
     const { now, offsetMs } = await getClockState();
-    return Response.json({ now: now.toISOString(), offsetMs, tick });
+    return Response.json({ now, offsetMs, tick });
   } catch {
     return apiError(503, "CLOCK_UNAVAILABLE", "The virtual clock is temporarily unavailable");
   }

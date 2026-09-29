@@ -208,14 +208,14 @@ export async function loadEngineContext(window?: Interval): Promise<EngineContex
         .map((department) => [department.id, department.building_id]),
     ),
     weights,
-    now: now.toISOString(),
+    now,
     tz: TZ,
   };
 }
 
 /** Apply all plan moves atomically through the migration-owned RPC. */
 export async function persistPlan(plan: Plan, actorId: string, action: string): Promise<void> {
-  const now = (await getNow()).toISOString();
+  const now = await getNow();
   type RpcMove = {
     request_id: string;
     room_id: string | null;

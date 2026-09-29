@@ -124,7 +124,7 @@ function setup(data: Tables = {}) {
   queryCalls.length = 0;
   mockFrom.mockImplementation((table: string) => makeQuery(table));
   mockRpc.mockResolvedValue({ error: null });
-  mockGetNow.mockResolvedValue(new Date("2026-09-29T08:30:00.000Z"));
+  mockGetNow.mockResolvedValue("2026-09-29T08:30:00.000Z");
 }
 
 describe("A6 engine adapter", () => {

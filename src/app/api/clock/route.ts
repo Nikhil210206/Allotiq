@@ -5,8 +5,9 @@ import { apiError } from "@/lib/http";
 
 export async function GET() {
   try {
+    // The raw offset is returned too so the demo control drawer can display it.
     const { now, offsetMs } = await getClockState();
-    return Response.json({ now: now.toISOString(), offsetMs });
+    return Response.json({ now, offsetMs });
   } catch {
     return apiError(503, "CLOCK_UNAVAILABLE", "The virtual clock is temporarily unavailable");
   }

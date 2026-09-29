@@ -99,6 +99,7 @@ function Body({ m }: { m: DashboardMetrics }) {
   const s = m.summary;
   const d = (cur: number, prev: number, label: string, better: "up" | "down") =>
     m.previousAvailable && Math.round(cur - prev) !== 0 ? { value: Math.round(cur - prev), label, better } : undefined;
+  const topBand = [...m.unmet.byBand].sort((a, b) => b.count - a.count).find((b) => b.count > 0)?.label;
   return (
     <div className="flex flex-col gap-5">
       <KpiBand
@@ -141,7 +142,16 @@ function Body({ m }: { m: DashboardMetrics }) {
         <Panel tone="volt" className="flex flex-col gap-5 p-6 md:p-8">
           <Eyebrow className="text-ink/60">Unmet demand</Eyebrow>
           <p className="display-3 text-ink">
-            {m.unmet.total} requests for 100+ seats <span className="serif-accent">on weekday evenings.</span>
+            {m.unmet.total === 0 ? (
+              <>
+                Every request <span className="serif-accent">found a room.</span>
+              </>
+            ) : (
+              <>
+                {m.unmet.total} {m.unmet.total === 1 ? "request" : "requests"} found no room
+                {topBand && <span className="serif-accent"> — mostly {topBand.toLowerCase()}.</span>}
+              </>
+            )}
           </p>
           <ul className="flex flex-col gap-2">
             {m.unmet.items.slice(0, 4).map((u) => (

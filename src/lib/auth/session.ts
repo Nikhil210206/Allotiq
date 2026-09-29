@@ -7,6 +7,7 @@ import type { Profile, UserRole } from "@/contracts/domain";
 import { apiError } from "@/lib/http";
 
 async function ssrClient() {
+  // cookies() is async in Next.js 15+ / 16
   const cookieStore = await cookies();
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,9 +19,11 @@ async function ssrClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            );
           } catch {
-            // Cookie writes are unavailable in read-only server component contexts.
+            // Ignore: called from a Server Component where cookies are read-only.
           }
         },
       },

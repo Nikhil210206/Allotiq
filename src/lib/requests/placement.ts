@@ -5,7 +5,7 @@ import { ACTIVE_STATUSES, TZ } from "@/contracts/domain";
 import { DEFAULT_WEIGHTS, type EngineRoom, type Violation } from "@/contracts/engine";
 import type { BookingRequest } from "@/contracts/domain";
 import type { db } from "@/lib/db/server";
-import { hardViolations } from "@/engine/feasibility";
+import { hardViolations } from "@/engine";
 import { parseRange } from "@/lib/db/mappers";
 
 export async function placementViolations(

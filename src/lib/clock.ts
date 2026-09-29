@@ -27,14 +27,14 @@ async function writeClockOffset(offsetMs: number): Promise<void> {
   if (error) throw new Error("Unable to update the virtual clock offset", { cause: error });
 }
 
-/** The virtual instant and its offset, read from one consistent settings result. */
-export async function getClockState(): Promise<{ now: Date; offsetMs: number }> {
+/** The virtual instant (ISO string) and its offset, read from one consistent settings result. */
+export async function getClockState(): Promise<{ now: string; offsetMs: number }> {
   const offsetMs = await readClockOffset();
-  return { now: new Date(Date.now() + offsetMs), offsetMs };
+  return { now: new Date(Date.now() + offsetMs).toISOString(), offsetMs };
 }
 
-/** Real time + the offset stored in app_settings.clock_offset_ms. */
-export async function getNow(): Promise<Date> {
+/** Real time + the offset stored in app_settings.clock_offset_ms, as an ISO string. */
+export async function getNow(): Promise<string> {
   return (await getClockState()).now;
 }
 

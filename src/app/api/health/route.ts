@@ -63,7 +63,7 @@ async function checkGroq(): Promise<Check> {
 async function checkClock(): Promise<Check> {
   try {
     const now = await getNow();
-    return { status: "ok", now: now.toISOString(), offsetMs: now.getTime() - Date.now() };
+    return { status: "ok", now, offsetMs: Date.parse(now) - Date.now() };
   } catch (e) {
     return errorOf(e);
   }

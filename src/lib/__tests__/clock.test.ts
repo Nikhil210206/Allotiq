@@ -61,13 +61,13 @@ describe("virtual clock database errors", () => {
     setupDb({ data: { value: 90_000 } });
     vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     await expect(getClockState()).resolves.toEqual({
-      now: new Date(1_090_000),
+      now: new Date(1_090_000).toISOString(),
       offsetMs: 90_000,
     });
 
     setupDb({ data: null });
     await expect(getClockState()).resolves.toEqual({
-      now: new Date(1_000_000),
+      now: new Date(1_000_000).toISOString(),
       offsetMs: 0,
     });
   });

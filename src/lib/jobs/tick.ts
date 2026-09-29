@@ -19,9 +19,8 @@ export interface TickResult {
 
 export async function runTick(): Promise<TickResult> {
   const supabase = db();
-  const nowDate = await getNow();
-  const now = nowDate.toISOString();
-  const nowMs = nowDate.getTime();
+  const now = await getNow();
+  const nowMs = Date.parse(now);
   const result: TickResult = { expired: 0, released: 0, refilled: 0, completed: 0, at: now };
 
   // One failing row must never stop the rest of the tick.

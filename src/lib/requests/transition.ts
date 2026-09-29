@@ -16,7 +16,7 @@ export async function transition(
   },
 ): Promise<void> {
   const supabase = db();
-  const now = (await getNow()).toISOString();
+  const now = await getNow();
 
   const { error } = await supabase
     .from("requests")
