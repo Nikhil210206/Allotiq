@@ -1,7 +1,34 @@
-// Virtual clock for the demo time machine. ALL business logic uses getNow(). Owner: Aditi · D3
-import "server-only";
+﻿import "server-only";
+import { db } from "@/lib/db/server";
 
-/** Real time + the offset stored in app_settings.clock_offset_ms. */
-export async function getNow(): Promise<Date> {
-  throw new Error("Not implemented yet (D3)");
+export async function getNow(): Promise<string> {
+  const supabase = db();
+  const { data } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "clock_offset_ms")
+    .maybeSingle();
+
+  const offsetMs = data?.value ? Number(data.value) : 0;
+  return new Date(Date.now() + offsetMs).toISOString();
+}
+
+export async function setClockOffset(offsetMs: number): Promise<void> {
+  const supabase = db();
+  await supabase
+    .from("app_settings")
+    .upsert({ key: "clock_offset_ms", value: offsetMs });
+}
+
+export async function advanceClock(minutes: number): Promise<void> {
+  const supabase = db();
+  const { data } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "clock_offset_ms")
+    .maybeSingle();
+
+  const currentOffset = data?.value ? Number(data.value) : 0;
+  const newOffset = currentOffset + minutes * 60000;
+  await setClockOffset(newOffset);
 }
