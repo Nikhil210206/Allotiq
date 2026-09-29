@@ -1,21 +1,32 @@
-// Thin wrappers over the analytics_* SQL functions. Also the ONLY tools "Ask the dashboard" may call.
-// Owner: Nikhil · N7
+// Thin wrappers over the analytics_* SQL functions (supabase/analytics/analytics.sql). The five tool
+// functions are also the ONLY tools "Ask the dashboard" may call. Owner: Nikhil · N7
 import "server-only";
+import { db } from "@/lib/db/server";
+import { analytics, type Rpc } from "./core";
 
-export type Range = { from: string; to: string; roomType?: string; buildingCode?: string };
+export type * from "./core";
 
-export async function utilization(_r: Range & { weekday?: number }) {
-  throw new Error("Not implemented yet (N7)");
-}
-export async function heatmap(_r: Range) {
-  throw new Error("Not implemented yet (N7)");
-}
-export async function ghostRate(_r: Range & { groupBy: "room" | "requester_kind" | "weekday" | "building" }) {
-  throw new Error("Not implemented yet (N7)");
-}
-export async function unmetDemand(_r: Range & { groupBy: "capacity_band" | "time_band" | "room_type" }) {
-  throw new Error("Not implemented yet (N7)");
-}
-export async function underusedRooms(_r: Range & { thresholdPct: number; weekday?: number }) {
-  throw new Error("Not implemented yet (N7)");
-}
+/** The analytics SQL hasn't been applied to this database yet (PostgREST can't find the function). */
+export class AnalyticsNotInstalled extends Error {}
+
+const rpc: Rpc = async (fn, args) => {
+  const { data, error } = await db().rpc(fn, args);
+  if (error?.code === "PGRST202")
+    throw new AnalyticsNotInstalled(`${fn} is missing — run supabase/analytics/analytics.sql on this database`);
+  if (error) throw new Error(`${fn}: ${error.message}`);
+  return (data ?? []) as unknown[];
+};
+
+const a = analytics(rpc);
+
+// ── "Ask the dashboard" tools (plan §6.4) ──
+export const utilization = a.utilization;
+export const heatmap = a.heatmap;
+export const ghostRate = a.ghostRate;
+export const unmetDemand = a.unmetDemand;
+export const underusedRooms = a.underusedRooms;
+
+// ── Dashboard only ──
+export const unmetRequests = a.unmetRequests;
+export const idleBuildingHours = a.idleBuildingHours;
+export const dashboardMetrics = a.dashboard;
