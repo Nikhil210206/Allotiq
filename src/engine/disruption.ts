@@ -92,8 +92,8 @@ export function previewDisruption(
   });
   const fixedRequests = affectedRequests.filter((request) => !movableRequests.some((item) => item.id === request.id));
 
-  let moves: Plan["moves"] = [];
-  let blockedIds = fixedRequests.map((request) => request.id);
+  const moves: Plan["moves"] = [];
+  const blockedIds = fixedRequests.map((request) => request.id);
   const assignedIds = new Set<string>();
   if (movableRequests.length > 0) {
     const result = getSolver("bnb").solve(movableRequests, context, options);

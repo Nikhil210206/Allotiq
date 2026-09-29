@@ -51,7 +51,7 @@ function configureDb(
   runOutput = output,
 ) {
   mockFrom.mockImplementation((table: string) => {
-    let filters: unknown[][] = [];
+    const filters: unknown[][] = [];
     const query: Record<string, unknown> = {
       select: () => query,
       eq: (column: string, value: unknown) => { filters.push([column, value]); return query; },
