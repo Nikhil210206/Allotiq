@@ -22,7 +22,7 @@ npm run dev                  # http://localhost:3000
 | `npm run typecheck` | Generate route types + `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm test` | Engine unit tests (Vitest) |
-| `npm run seed` | Seed catalog, history and demo scenarios |
+| `npm run seed` | Wipe activity and seed catalog, 4-week history and demo scenarios (`-- --dry-run` to preview) |
 | `npm run db:types` | Regenerate Supabase types (after a migration) |
 
 ## Project structure
