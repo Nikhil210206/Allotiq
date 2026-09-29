@@ -74,6 +74,17 @@ export async function seedCatalog(db: SupabaseClient): Promise<void> {
   // Drop catalog rows that aren't in the seed any more (e.g. created through the admin UI).
   const notIn = (xs: string[]) => `(${xs.join(",")})`;
   await check("stale rooms", db.from("rooms").delete().not("id", "in", notIn(ROOMS.map((r) => ids.room(r.code)))));
+  
+  // D14: Create demo_token for judge
+  await check(
+    "demo_token judge",
+    db.from("demo_tokens").upsert({
+      token: "demo-judge-token",
+      user_id: ids.user("judge"),
+      expires_at: null,
+      used_count: 0
+    })
+  );
   await check(
     "stale departments",
     db.from("departments").delete().not("id", "in", notIn(DEPARTMENTS.map((d) => ids.department(d.code)))),
