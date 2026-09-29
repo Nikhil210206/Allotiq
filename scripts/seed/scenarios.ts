@@ -42,7 +42,7 @@ export async function seedScenarios(db: SupabaseClient, anchor: string): Promise
       requester_id: ids.user(f.who),
       title: f.title,
       purpose: f.purpose,
-      priority: PURPOSE_PRIORITY[f.purpose],
+      priority: PURPOSE_PRIORITY[f.purpose as keyof typeof PURPOSE_PRIORITY],
       headcount: f.headcount,
       min_systems: f.minSystems ?? 0,
       required_features: f.features ?? [],

@@ -112,11 +112,11 @@ export async function POST(req: Request) {
         headcount: draft.headcount,
         minSystems: draft.minSystems,
         features: draft.requiredFeatures as EngineRequest["features"],
-        roomType: draft.roomType,
+        roomType: draft.roomType ?? undefined,
         interval: draft.during,
         priority,
         createdAt: now,
-        preferredBuildingId: draft.preferredBuildingId,
+        preferredBuildingId: draft.preferredBuildingId ?? undefined,
         history: {},
       };
       const alts = alternatives(engReq, ctx, roomId);
