@@ -3,7 +3,7 @@
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db/server";
 import { apiError } from "@/lib/http";
-import type { BookingRequest, AuditEntry, Room } from "@/contracts/domain";
+import type { BookingRequest, AuditEntry, Room, Feature } from "@/contracts/domain";
 import type { RequestDetail } from "@/contracts/api";
 
 function rowToRequest(r: Record<string, unknown>): BookingRequest {
@@ -18,7 +18,7 @@ function rowToRequest(r: Record<string, unknown>): BookingRequest {
     priority: r.priority as number,
     headcount: r.headcount as number,
     minSystems: (r.min_systems as number) ?? 0,
-    requiredFeatures: (r.required_features as string[]) ?? [],
+    requiredFeatures: (r.required_features as Feature[]) ?? [],
     roomType: (r.room_type as BookingRequest["roomType"]) ?? null,
     preferredBuildingId: (r.preferred_building_id as string) ?? null,
     during: { start, end },
@@ -58,7 +58,7 @@ function rowToRoom(r: Record<string, unknown>): Room {
     type: r.type as Room["type"],
     capacity: r.capacity as number,
     systemsCount: (r.systems_count as number) ?? 0,
-    features: (r.features as string[]) ?? [],
+    features: (r.features as Feature[]) ?? [],
     departmentId: (r.department_id as string) ?? null,
     access: r.access as Room["access"],
     approverId: (r.approver_id as string) ?? null,

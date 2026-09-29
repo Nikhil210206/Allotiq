@@ -47,7 +47,7 @@ export function RequestStatusView({ id }: { id: string }) {
   const [busy, setBusy] = useState<string | null>(null);
 
   if (loading && !data) return <Loading className="pt-16" rows={4} />;
-  if (error && !data) return <ErrorNote className="mt-16">{error.message}</ErrorNote>;
+  if (error && !data) return <ErrorNote className="mt-16">{error}</ErrorNote>;
   if (!data) return null;
 
   const r = data.request;

@@ -44,7 +44,7 @@ export function ApprovalReview({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
 
   if (loading && !data) return <Loading className="mx-auto w-full max-w-3xl pt-16" rows={3} />;
-  if (error && !data) return <ErrorNote className="mx-auto mt-16 w-full max-w-3xl">{error.message}</ErrorNote>;
+  if (error && !data) return <ErrorNote className="mx-auto mt-16 w-full max-w-3xl">{error}</ErrorNote>;
   if (!data) return null;
   const r = data.request;
   const room = data.room ?? roomOf(r.roomId);
