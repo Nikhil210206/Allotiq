@@ -25,10 +25,16 @@ export async function proxy(request: NextRequest) {
   // getUser() revalidates the token and rotates it when expired; setAll above writes the new cookie.
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Signed-out visitors go to /login?next=<page>. Magic links land here before LinkSession has stored the
+  // session (it's in the URL hash, which the browser carries across this redirect), so LinkSession sends
+  // them on to `next` once the cookie is set.
   const path = request.nextUrl.pathname;
-  if (!user && !path.startsWith("/api") && !path.startsWith("/login") && !path.startsWith("/join")) {
+  const isPublic = path === "/" || ["/api", "/login", "/join", "/kit"].some((p) => path === p || path.startsWith(`${p}/`));
+  if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    loginUrl.searchParams.set("next", path + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 

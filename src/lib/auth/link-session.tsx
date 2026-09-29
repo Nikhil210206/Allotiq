@@ -27,8 +27,14 @@ export function LinkSession() {
     void browserDb()
       .auth.setSession({ access_token: accessToken!, refresh_token: refreshToken })
       .then(({ error }) => {
-        if (error) router.replace("/login?error=session");
-        else window.location.replace(window.location.pathname + window.location.search);
+        if (error) {
+          router.replace("/login?error=session");
+          return;
+        }
+        // The proxy bounces signed-out pages to /login?next=<page>; finish the trip there. Same-origin paths only.
+        const next = new URLSearchParams(window.location.search).get("next");
+        const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+        window.location.replace(safeNext ?? window.location.pathname + window.location.search);
       });
   }, [router]);
 
