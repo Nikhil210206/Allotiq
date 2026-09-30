@@ -33,6 +33,7 @@ const QUESTIONS = [
   "Where do ghost bookings happen most?",
   "What demand couldn't we meet last month?",
 ];
+const ASK_CHART_ROWS = 8;
 
 export function Dashboard() {
   const now = useNow(60_000);
@@ -260,7 +261,11 @@ function Ask() {
           {answer.a.chart && (
             <div className="flex flex-col gap-4">
               <p className="eyebrow text-fg-3">{answer.a.chart.title}</p>
-              <BarList tone="volt" unit={answer.a.chart_tool_call_id === "unmet" ? "" : "%"} rows={answer.a.chart.rows} />
+              {/* The analytics tools can return every room; the answer panel shows the top rows only. */}
+              <BarList tone="volt" unit={answer.a.chart_tool_call_id === "unmet" ? "" : "%"} rows={answer.a.chart.rows.slice(0, ASK_CHART_ROWS)} />
+              {answer.a.chart.rows.length > ASK_CHART_ROWS && (
+                <p className="text-[13px] text-fg-3">+{answer.a.chart.rows.length - ASK_CHART_ROWS} more</p>
+              )}
             </div>
           )}
         </div>

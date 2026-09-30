@@ -21,7 +21,8 @@ export function Disruptions() {
   const [roomId, setRoomId] = useState("");
   const [date, setDate] = useState("");
   const [from, setFrom] = useState("08:00");
-  const [to, setTo] = useState("20:00");
+  // Working-day closure by default: the evening stays open, so a bumped booking can be offered 18:00 the same day.
+  const [to, setTo] = useState("18:00");
   const [reason, setReason] = useState(REASONS[0]);
   const [busy, setBusy] = useState<"preview" | "apply" | null>(null);
   const [preview, setPreview] = useState<DisruptionPreviewResponse | null>(null);

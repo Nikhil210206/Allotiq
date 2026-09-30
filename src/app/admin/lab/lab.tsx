@@ -56,7 +56,8 @@ function handledOrder(res: SolveResult, reqs: EngineRequest[]): string[] {
 export function Lab() {
   const { data: scenarios, error, loading } = useApi("lab-scenarios", api.lab.scenarios);
   const [picked, setPicked] = useState<string | null>(null);
-  const sc = scenarios?.find((s) => s.id === picked) ?? scenarios?.[0];
+  // Open on the demo's scene-2 scenario when it exists; the API lists scenarios by name.
+  const sc = scenarios?.find((s) => s.id === picked) ?? scenarios?.find((s) => s.id === "clash-8") ?? scenarios?.[0];
   if (loading && !scenarios) return <Loading className="pt-16" rows={3} />;
   if (error && !scenarios) return <ErrorNote className="mt-16">{error.message}</ErrorNote>;
   if (!sc)

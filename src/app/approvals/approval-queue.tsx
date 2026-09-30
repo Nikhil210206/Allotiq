@@ -33,7 +33,10 @@ export function requesterLine(r: RequestRow) {
 export function ApprovalQueue() {
   const { data, error, loading } = useApi("approvals", api.approvals, { refreshMs: 5000 });
   const [gone, setGone] = useState<Set<string>>(new Set());
-  const rows = (data ?? []).filter((r) => !gone.has(r.id));
+  // Soonest-expiring hold first, as the page promises; the API doesn't guarantee an order.
+  const rows = (data ?? [])
+    .filter((r) => !gone.has(r.id))
+    .sort((a, b) => (a.holdExpiresAt ?? "￿").localeCompare(b.holdExpiresAt ?? "￿") || a.during.start.localeCompare(b.during.start));
 
   const approve = async (r: RequestRow) => {
     setGone((g) => new Set(g).add(r.id));

@@ -136,8 +136,13 @@ export function Headline({
     const Tag = as;
     return <Tag className={classes}>{content}</Tag>;
   }
+  // SplitText rewrites the heading's DOM into per-letter spans, so React can't patch new text into it.
+  // Keying on the text remounts (and replays) the reveal when a data-driven heading changes.
+  const textKey = [lead, accent].every((x) => x == null || typeof x === "string" || typeof x === "number")
+    ? `${lead}|${accent ?? ""}`
+    : undefined;
   return (
-    <RevealText as={as} onScroll={onScroll} className={classes}>
+    <RevealText key={textKey} as={as} onScroll={onScroll} className={classes}>
       {content}
     </RevealText>
   );
