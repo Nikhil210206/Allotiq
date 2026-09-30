@@ -2,11 +2,12 @@
 // on /login (a cookie), else the section's default persona. Owner: Nikhil
 import "server-only";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { UserRole } from "@/contracts/domain";
 import { getSessionUser } from "@/lib/auth/session";
 import { PERSONA_COOKIE, ROLE_OF_PERSONA, deptShort, personaProfile, type Persona } from "@/lib/mock/catalog";
 import type { ShellUser } from "./app-shell";
-import { ROLE_LABEL } from "./nav";
+import { ROLE_HOME, ROLE_LABEL } from "./nav";
 
 const DEFAULT_PERSONA: Record<UserRole, Persona> = { requester: "faculty", approver: "approver", admin: "admin" };
 
@@ -16,6 +17,16 @@ function captionFor(persona: Persona) {
   if (persona === "approver") return "Approves Tech Park labs";
   if (p.kind === "student") return `Student · ${deptShort(p.departmentId) ?? ""}`;
   return p.orgName ?? ROLE_LABEL[p.role];
+}
+
+/**
+ * getShellUser for a section only some roles may use: anyone else is sent to their own home instead of
+ * a page whose every panel would answer 403 (the APIs enforce roles; this keeps the UI from looking broken).
+ */
+export async function getShellUserFor(sectionRole: UserRole, allowed: UserRole[]): Promise<ShellUser> {
+  const user = await getShellUser(sectionRole);
+  if (!allowed.includes(user.role)) redirect(ROLE_HOME[user.role]);
+  return user;
 }
 
 export async function getShellUser(sectionRole: UserRole): Promise<ShellUser> {
