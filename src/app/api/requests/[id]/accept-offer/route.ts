@@ -44,10 +44,13 @@ export async function POST(
   const minExpiry = nowMs + TIMING.holdMinMinutes * 60_000;
   const maxExpiry = nowMs + TIMING.holdMaxMinutes * 60_000;
   const beforeStart = startMs - TIMING.holdBeforeStartMinutes * 60_000;
-  const holdExpiresAt = new Date(Math.max(minExpiry, Math.min(maxExpiry, beforeStart))).toISOString();
+  const nextStatus = r.status === "bumped" ? "approved" : "pending";
+  const holdExpiresAt = nextStatus === "pending"
+    ? new Date(Math.max(minExpiry, Math.min(maxExpiry, beforeStart))).toISOString()
+    : null;
 
   try {
-    await transition(id, "pending", {
+    await transition(id, nextStatus, {
       actorId: actor.id,
       expectedStatus: r.status as RequestStatus,
       action: "accept_offer",

@@ -49,7 +49,8 @@ export async function transition(
       .eq("status", opts.expectedStatus)
       .select("id")
       .maybeSingle());
-  } catch {
+  } catch (err) {
+    console.error("[transition]", err);
     throw new Error("Unable to update this request.");
   }
 
@@ -62,6 +63,7 @@ export async function transition(
       throw new Error("Headcount exceeds room capacity.");
     if (error.message.includes("ROOM_BLACKOUT"))
       throw new Error("Room has a maintenance blackout in that time window.");
+    console.error("[transition]", error);
     throw new Error("Unable to update this request.");
   }
 

@@ -86,6 +86,10 @@ export async function seedCatalog(db: SupabaseClient, anchor?: string): Promise<
     })
   );
   await check(
+    "stale demo_tokens",
+    db.from("demo_tokens").delete().neq("token", JUDGE_JOIN_TOKEN)
+  );
+  await check(
     "stale departments",
     db.from("departments").delete().not("id", "in", notIn(DEPARTMENTS.map((d) => ids.department(d.code)))),
   );
