@@ -1,5 +1,5 @@
-// The landing page body (also shown at /kit as the style guide): every kit piece in the
-// composition it's meant for. Sample data from the demo scenes. Owner: Nikhil · N2
+// The landing page body: every kit piece in the composition it's meant for. Sample data
+// from the demo scenes. Owner: Nikhil · N2
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, Building2, Check, Gauge, Users } from "lucide-react";

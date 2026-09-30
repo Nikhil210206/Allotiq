@@ -51,7 +51,7 @@ src/
     clock.ts notify.ts http.ts
   hooks/                     Realtime hooks (notifications, live request)
   components/ui/             shadcn primitives
-  components/kit/            Allotiq design kit (tokens, AppShell, KPI, status, score, dither) — live at /kit
+  components/kit/            Allotiq design kit (tokens, AppShell, KPI, status, score, dither)
   proxy.ts                   Session refresh + auth redirect (Next 16 "proxy")
   app/
     (auth)/login  join/      Sign in, judge QR join

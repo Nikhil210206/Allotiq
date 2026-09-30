@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   // session (it's in the URL hash, which the browser carries across this redirect), so LinkSession sends
   // them on to `next` once the cookie is set.
   const path = request.nextUrl.pathname;
-  const isPublic = path === "/" || ["/api", "/login", "/join", "/kit"].some((p) => path === p || path.startsWith(`${p}/`));
+  const isPublic = path === "/" || ["/api", "/login", "/join"].some((p) => path === p || path.startsWith(`${p}/`));
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
