@@ -34,7 +34,7 @@ export async function setDemoClock(db: SupabaseClient, anchor: string): Promise<
 /** Returns the anchor the clock was set to. */
 export async function resetDemo(db: SupabaseClient, anchor: string = resolveAnchor()): Promise<string> {
   await wipeActivity(db);
-  await seedCatalog(db);
+  await seedCatalog(db, anchor);
   await seedHistory(db, anchor);
   await seedScenarios(db, anchor);
   await setDemoClock(db, anchor);

@@ -10,7 +10,7 @@ async function check<T>(label: string, p: PromiseLike<{ error: { message: string
   if (error) throw new Error(`${label}: ${error.message}`);
 }
 
-export async function seedCatalog(db: SupabaseClient): Promise<void> {
+export async function seedCatalog(db: SupabaseClient, anchor?: string): Promise<void> {
   await check(
     "buildings",
     db.from("buildings").upsert(BUILDINGS.map((b) => ({ id: ids.building(b.code), ...b }))),
@@ -81,7 +81,7 @@ export async function seedCatalog(db: SupabaseClient): Promise<void> {
     db.from("demo_tokens").upsert({
       token: JUDGE_JOIN_TOKEN,
       user_id: ids.user("judge"),
-      expires_at: null,
+      expires_at: anchor ? new Date(Date.parse(anchor) + 86400000).toISOString() : null,
       used_count: 0
     })
   );

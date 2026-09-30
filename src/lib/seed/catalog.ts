@@ -95,7 +95,7 @@ export const PERSONAS = {
 export const emailOf = (key: string) => `${key}@${EMAIL_DOMAIN}`;
 
 /** The judges' QR token: /join?t=<this> signs in as the demo approver. Seeded into demo_tokens. */
-export const JUDGE_JOIN_TOKEN = "demo-judge-token";
+export const JUDGE_JOIN_TOKEN = "jk83-9m2p-105x";
 
 const LAB: Feature[] = ["computers", "projector", "ac", "whiteboard"];
 const CLASS: Feature[] = ["projector", "whiteboard"];
