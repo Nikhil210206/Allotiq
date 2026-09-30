@@ -1,5 +1,6 @@
 // Deterministic multi-solver execution for Allocation Lab. Owner: Aaditya · A9
 import type { EngineContext, EngineRequest, SolveResult, SolverName } from "@/contracts/engine";
+import { counterfactual } from "./explain";
 import { getSolver } from "./solvers";
 
 function isolatedContext(ctx: EngineContext): EngineContext {
@@ -27,23 +28,8 @@ function explanation(results: SolveResult[], requests: EngineRequest[], ctx: Eng
     ).join(". ");
   }
 
-  const roomCodes = new Map(ctx.rooms.map((room) => [room.id, room.code]));
-  const fcfsAssignments = new Map(fcfs.assignments.map((assignment) => [assignment.requestId, assignment.roomId]));
-  const engineAssignments = new Map(engine.assignments.map((assignment) => [assignment.requestId, assignment.roomId]));
-  const labels = new Map(requests.map((request) => [request.id, request.label ?? "A request"]));
-  const changes = requests.flatMap((request) => {
-    const before = fcfsAssignments.get(request.id) ?? null;
-    const after = engineAssignments.get(request.id) ?? null;
-    if (before === after) return [];
-    const label = labels.get(request.id) ?? "A request";
-    if (before && after) return [`${label} moved from ${roomCodes.get(before) ?? "a room"} to ${roomCodes.get(after) ?? "a room"}`];
-    if (after) return [`${label} gained ${roomCodes.get(after) ?? "a room"}`];
-    if (before) return [`${label} was placed by FCFS in ${roomCodes.get(before) ?? "a room"} but not by B&B`];
-    return [];
-  });
-
-  const summary = `FCFS placed ${fcfs.metrics.placed}/${fcfs.metrics.total}; B&B placed ${engine.metrics.placed}/${engine.metrics.total}`;
-  return changes.length > 0 ? `${summary}. ${changes.join(". ")}.` : `${summary}.`;
+  const roomLookup = new Map(ctx.rooms.map((room) => [room.id, room.code]));
+  return counterfactual(fcfs, engine, requests, roomLookup);
 }
 
 export function runLabScenario(

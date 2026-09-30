@@ -1,6 +1,6 @@
 // Groq client: server-only key, model resolution via /models, timeouts, 429 backoff, circuit breaker, GROQ_DISABLED. Owner: Aaditya · A8
 import "server-only";
-import Groq from "groq-sdk";
+import Groq, { type Uploadable } from "groq-sdk";
 import { PARSED_REQUEST_JSON_SCHEMA } from "@/contracts/ai";
 
 const DEFAULT_PARSE_MODEL = "openai/gpt-oss-20b";
@@ -172,5 +172,67 @@ export async function requestGroqJson(systemPrompt: string, userText: string): P
     return content;
   } catch {
     throw new Error("Groq response is unavailable");
+  }
+}
+
+const DEFAULT_TRANSCRIBE_MODEL = "whisper-large-v3-turbo";
+const TRANSCRIBE_TIMEOUT_MS = 15000;
+let cachedTranscribeModel: { configured: string; selected: string; expiresAt: number } | null = null;
+
+async function resolveTranscribeModel(groq: GroqClient, signal: AbortSignal): Promise<string> {
+  const configured = process.env.GROQ_MODEL_TRANSCRIBE?.trim() || DEFAULT_TRANSCRIBE_MODEL;
+  if (cachedTranscribeModel && cachedTranscribeModel.configured === configured && cachedTranscribeModel.expiresAt > performance.now()) {
+    return cachedTranscribeModel.selected;
+  }
+
+  try {
+    const { data } = await withRateLimitRetries(() => groq.models.list({ signal }), signal);
+    const available = new Set(data.map((model) => model.id));
+    const selected = [configured, DEFAULT_TRANSCRIBE_MODEL, "whisper-large-v3"].find((model) => available.has(model));
+    if (selected) {
+      cachedTranscribeModel = { configured, selected, expiresAt: performance.now() + MODEL_CACHE_MS };
+      return selected;
+    }
+  } catch {
+    // If models.list is unavailable or restricted, fall back to configured
+  }
+
+  cachedTranscribeModel = { configured, selected: configured, expiresAt: performance.now() + MODEL_CACHE_MS };
+  return configured;
+}
+
+/** Call only from server-side A13 transcription. Provider failures intentionally expose no raw details. */
+export async function requestGroqTranscription(audio: File | Blob): Promise<string> {
+  if (!groqEnabled()) throw new Error("Groq is disabled");
+  if (circuitIsOpen()) throw new Error("Groq circuit is open");
+
+  try {
+    const groq = getClient();
+    const signal = AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS);
+    const model = await resolveTranscribeModel(groq, signal);
+    const file = typeof File !== "undefined" && audio instanceof File
+      ? audio
+      : typeof File !== "undefined"
+        ? new File([audio], "voice.webm", { type: audio.type || "audio/webm" })
+        : audio;
+
+    const result = await withRateLimitRetries(
+      () => groq.audio.transcriptions.create({
+        file: file as Uploadable,
+        model,
+        language: "en",
+        response_format: "json",
+        temperature: 0,
+      }, { signal }),
+      signal,
+    );
+
+    const text = typeof result?.text === "string" ? result.text.trim() : "";
+    return text;
+  } catch (error) {
+    if (error instanceof Error && (error.message === "Groq is disabled" || error.message === "Groq circuit is open")) {
+      throw error;
+    }
+    throw new Error("Groq transcription is unavailable");
   }
 }

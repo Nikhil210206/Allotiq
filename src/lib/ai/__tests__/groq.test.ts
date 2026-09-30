@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { MockGroq, mockModelsList, mockCreate } = vi.hoisted(() => ({
+const { MockGroq, mockModelsList, mockCreate, mockCreateTranscribe } = vi.hoisted(() => ({
   MockGroq: vi.fn(function MockGroqConstructor() {
     return {
       models: { list: mockModelsList },
       chat: { completions: { create: mockCreate } },
+      audio: { transcriptions: { create: mockCreateTranscribe } },
     };
   }),
   mockModelsList: vi.fn(),
   mockCreate: vi.fn(),
+  mockCreateTranscribe: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -142,5 +144,49 @@ describe("Groq structured parser client", () => {
     expect(mockCreate).toHaveBeenCalledTimes(5);
     await expect(parse()).rejects.toThrow("Groq circuit is open");
     expect(mockCreate).toHaveBeenCalledTimes(5);
+  });
+});
+
+describe("Groq audio transcription client", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    groqModule = await import("../groq");
+    vi.stubEnv("GROQ_API_KEY", `test-key-${++keyCounter}`);
+    vi.stubEnv("GROQ_DISABLED", "false");
+    mockModelsList.mockResolvedValue({ data: [{ id: "whisper-large-v3-turbo" }] });
+    mockCreateTranscribe.mockResolvedValue({ text: "  Transcribed speech text  " });
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("calls audio.transcriptions.create with English settings and returns trimmed text", async () => {
+    const audio = new Blob(["audio-data"], { type: "audio/webm" });
+    const result = await groqModule.requestGroqTranscription(audio);
+
+    expect(result).toBe("Transcribed speech text");
+    expect(mockCreateTranscribe).toHaveBeenCalledTimes(1);
+    const [callArgs] = mockCreateTranscribe.mock.calls[0];
+    expect(callArgs.model).toBe("whisper-large-v3-turbo");
+    expect(callArgs.language).toBe("en");
+    expect(callArgs.response_format).toBe("json");
+    expect(callArgs.temperature).toBe(0);
+  });
+
+  it("throws a safe generic error and records failure when provider call fails", async () => {
+    mockCreateTranscribe.mockRejectedValue(providerFailure());
+    const audio = new Blob(["audio-data"], { type: "audio/webm" });
+
+    await expect(groqModule.requestGroqTranscription(audio)).rejects.toThrow(
+      "Groq transcription is unavailable",
+    );
+  });
+
+  it("rejects immediately when Groq is disabled", async () => {
+    vi.stubEnv("GROQ_DISABLED", "true");
+    const audio = new Blob(["audio-data"], { type: "audio/webm" });
+
+    await expect(groqModule.requestGroqTranscription(audio)).rejects.toThrow("Groq is disabled");
+    expect(mockCreateTranscribe).not.toHaveBeenCalled();
   });
 });
