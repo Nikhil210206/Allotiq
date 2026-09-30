@@ -42,7 +42,7 @@ export async function runTick(): Promise<TickResult> {
     .lte("hold_expires_at", now);
 
   await each(toExpire, async (r) => {
-    await transition(r.id, "expired", { actorId: null, expectedStatus: r.status as any, action: "auto_expire" });
+    await transition(r.id, "expired", { actorId: null, expectedStatus: r.status, action: "auto_expire" });
     await notify(r.requester_id, {
       kind: "expired",
       title: `"${r.title}" hold expired`,

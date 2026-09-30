@@ -72,8 +72,6 @@ async function seedLabScenarios(db: SupabaseClient, anchor: string): Promise<voi
   if (error) throw new Error(`Lab scenarios: ${error.message}`);
 }
 
-type RequestStatus = "waitlisted" | "pending" | "approved" | "checked_in" | "completed" | "auto_released" | "cancelled" | "expired" | "bumped";
-
 function holdExpiry(startIso: string, at: Date) {
   const t = at.getTime();
   return new Date(Math.max(t + 10 * 60_000, Math.min(t + 120 * 60_000, Date.parse(startIso) - 30 * 60_000))).toISOString();
