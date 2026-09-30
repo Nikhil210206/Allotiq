@@ -12,15 +12,23 @@ import { resolveAnchor } from "./random";
  * judges' join links) are configuration, so they survive a reset.
  */
 export async function wipeActivity(db: SupabaseClient): Promise<void> {
-  // Sequential on purpose: notifications and audit rows reference requests.
+  // Three steps in order: notifications and audit rows reference requests, so they go first.
   const ok = (table: string, { error }: { error: { message: string } | null }) => {
     if (error) throw new Error(`wipe ${table}: ${error.message}`);
   };
-  ok("notifications", await db.from("notifications").delete().not("id", "is", null));
-  ok("audit_log", await db.from("audit_log").delete().gte("id", 0));
+  const [notifications, audit] = await Promise.all([
+    db.from("notifications").delete().not("id", "is", null),
+    db.from("audit_log").delete().gte("id", 0),
+  ]);
+  ok("notifications", notifications);
+  ok("audit_log", audit);
   ok("requests", await db.from("requests").delete().not("id", "is", null));
-  ok("room_blackouts", await db.from("room_blackouts").delete().not("id", "is", null));
-  ok("engine_runs", await db.from("engine_runs").delete().not("id", "is", null));
+  const [blackouts, runs] = await Promise.all([
+    db.from("room_blackouts").delete().not("id", "is", null),
+    db.from("engine_runs").delete().not("id", "is", null),
+  ]);
+  ok("room_blackouts", blackouts);
+  ok("engine_runs", runs);
 }
 
 export async function setDemoClock(db: SupabaseClient, anchor: string): Promise<void> {

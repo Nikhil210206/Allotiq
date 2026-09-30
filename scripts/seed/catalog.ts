@@ -23,15 +23,18 @@ export async function seedCatalog(db: SupabaseClient, anchor?: string): Promise<
   );
 
   // Auth users first (profiles.id references auth.users). No passwords: demo login uses magic links.
-  for (const u of USERS) {
-    const id = ids.user(u.key);
-    const attrs = { email: emailOf(u.key), email_confirm: true, user_metadata: { full_name: u.fullName } };
-    const existing = await db.auth.admin.getUserById(id);
-    const { error } = existing.data.user
-      ? await db.auth.admin.updateUserById(id, attrs)
-      : await db.auth.admin.createUser({ id, ...attrs });
-    if (error) throw new Error(`auth user ${u.key}: ${error.message}`);
-  }
+  // In parallel: two auth round trips per user, one after another, made the demo reset crawl.
+  await Promise.all(
+    USERS.map(async (u) => {
+      const id = ids.user(u.key);
+      const attrs = { email: emailOf(u.key), email_confirm: true, user_metadata: { full_name: u.fullName } };
+      const existing = await db.auth.admin.getUserById(id);
+      const { error } = existing.data.user
+        ? await db.auth.admin.updateUserById(id, attrs)
+        : await db.auth.admin.createUser({ id, ...attrs });
+      if (error) throw new Error(`auth user ${u.key}: ${error.message}`);
+    }),
+  );
   await check(
     "profiles",
     db.from("profiles").upsert(

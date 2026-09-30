@@ -77,14 +77,15 @@ export function DemoControls({ compact = false }: { compact?: boolean }) {
           <Timer /> Jump to 14:16
         </Button>
         <Button variant="secondary" disabled={!!busy} onClick={() => run("tick", () => api.demo.tick(), "Jobs ran: holds, no-shows, waitlist")}>
-          <Zap /> Run jobs now
+          <Zap /> {busy === "tick" ? "Running…" : "Run jobs now"}
         </Button>
         <Button
           variant="outline"
           disabled={!!busy}
           onClick={() => run("reset", () => api.demo.reset(), "Demo reset — Wednesday 13:50")}
         >
-          <RotateCcw /> Reset demo
+          <RotateCcw className={cn(busy === "reset" && "animate-spin [animation-direction:reverse]")} />
+          {busy === "reset" ? "Resetting…" : "Reset demo"}
         </Button>
       </div>
 

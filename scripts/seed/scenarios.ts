@@ -127,11 +127,14 @@ async function seedRequestScenarios(db: SupabaseClient, anchor: string): Promise
     };
   });
 
-  for (const row of rows) {
-    if (row.room_id) {
-      await db.from("requests").delete().eq("room_id", row.room_id).overlaps("during", row.during);
-    }
-  }
+  await Promise.all(
+    rows
+      .filter((row) => row.room_id)
+      .map(async (row) => {
+        const { error } = await db.from("requests").delete().eq("room_id", row.room_id).overlaps("during", row.during);
+        if (error) throw new Error(`scenarios: clear ${row.room_id}: ${error.message}`);
+      }),
+  );
 
   const { error } = await db.from("requests").upsert(rows);
   if (error) throw new Error(`scenarios: ${error.message}`);
