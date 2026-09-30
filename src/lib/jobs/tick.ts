@@ -37,12 +37,12 @@ export async function runTick(): Promise<TickResult> {
   // ── 1. EXPIRE: pending holds past their expiry ────────────────────────────────
   const { data: toExpire } = await supabase
     .from("requests")
-    .select("id, requester_id, title")
-    .eq("status", "pending")
+    .select("id, requester_id, title, status")
+    .in("status", ["pending", "bumped"])
     .lte("hold_expires_at", now);
 
   await each(toExpire, async (r) => {
-    await transition(r.id, "expired", { actorId: null, expectedStatus: "pending", action: "auto_expire" });
+    await transition(r.id, "expired", { actorId: null, expectedStatus: r.status as any, action: "auto_expire" });
     await notify(r.requester_id, {
       kind: "expired",
       title: `"${r.title}" hold expired`,

@@ -42,6 +42,11 @@ function configureQueries() {
         mockFilters.value.push({ method: "eq", args: [column, value] });
         return query;
       },
+      in: (column: string, value: unknown[]) => {
+        if (column === "status") status = String(value[0]);
+        mockFilters.value.push({ method: "in", args: [column, value] });
+        return query;
+      },
       lt: (column: string, value: unknown) => { mockFilters.value.push({ method: "lt", args: [column, value] }); return query; },
       lte: (column: string, value: unknown) => { mockFilters.value.push({ method: "lte", args: [column, value] }); return query; },
       is: (column: string, value: unknown) => { mockFilters.value.push({ method: "is", args: [column, value] }); return query; },
@@ -67,7 +72,7 @@ describe("runTick lifecycle transitions", () => {
 
   it("expires a hold at the exact business-time deadline", async () => {
     mockRowsByStatus.value.pending = [{
-      id: "pending-1", requester_id: "requester", title: "Pending", hold_expires_at: now,
+      id: "pending-1", requester_id: "requester", title: "Pending", hold_expires_at: now, status: "pending"
     }];
     await runTick();
     expect(mockFilters.value).toContainEqual({ method: "lte", args: ["hold_expires_at", now] });
