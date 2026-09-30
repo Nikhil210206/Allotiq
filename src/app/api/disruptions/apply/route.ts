@@ -1,6 +1,6 @@
 // POST /api/disruptions/apply — Persist a validated disruption plan and notify requesters
 // Owner: Aaditya · Task A11
-import { ACTIVE_STATUSES, REQUEST_STATUSES, type Interval } from "@/contracts/domain";
+import { ACTIVE_STATUSES, REQUEST_STATUSES, TIMING, type Interval } from "@/contracts/domain";
 import { IntervalSchema } from "@/contracts/api";
 import type { Plan } from "@/contracts/engine";
 import { affectedDisruptionRequests, previewDisruption } from "@/engine/disruption";
@@ -172,6 +172,23 @@ export async function POST(request: Request) {
       p_at: now,
     });
     if (applyError) throw new Error("Unable to apply disruption");
+
+    // A bumped booking's offers get a deadline like any hold, so the tick can expire an unanswered offer
+    // (apply_plan sets the status and offers but no hold_expires_at). Not a status change, so no transition().
+    const nowMs = Date.parse(now);
+    await Promise.all(savedPlan.moves.filter((move) => move.status === "bumped").map((move) => {
+      // Other-slot offers carry their own time; similar-room offers are for the booking's own slot.
+      const starts = (move.offers?.sameRoomOtherSlot ?? []).map((offer) => Date.parse(offer.interval.start));
+      if (move.offers?.similarRoomSameSlot?.length) starts.push(Date.parse(move.interval.start));
+      const firstStart = starts.length ? Math.min(...starts) : Date.parse(move.interval.start);
+      const expiresMs = Math.max(
+        nowMs + TIMING.holdMinMinutes * 60_000,
+        Math.min(nowMs + TIMING.holdMaxMinutes * 60_000, firstStart - TIMING.holdBeforeStartMinutes * 60_000),
+      );
+      return db().from("requests").update({ hold_expires_at: new Date(expiresMs).toISOString() })
+        .eq("id", move.requestId).eq("status", "bumped")
+        .then(({ error }) => { if (error) console.error("[disruption apply] offer deadline", move.requestId, error); });
+    }));
 
     const requestById = new Map(engineRequests.map((engineRequest) => [engineRequest.id, engineRequest]));
     await Promise.all(savedPlan.moves.map((move) => {

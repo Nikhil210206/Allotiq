@@ -24,6 +24,8 @@ export interface LabScenario {
   roomIds?: string[];
   /** Scenarios may bring their own rooms (e.g. the brief's A/B/C fixture). */
   rooms?: Room[];
+  /** Requests exist only in the scenario, so its plan can be shown but not applied to real bookings. */
+  sandbox?: boolean;
 }
 
 /** POST /api/lab/replay: re-solves a recorded Lab run from its stored snapshot and diffs it with the recording. */

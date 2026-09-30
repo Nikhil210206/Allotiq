@@ -4,7 +4,7 @@ import { AskAnswerSchema, type AskResponse } from "@/contracts/ai";
 import { getNow } from "@/lib/clock";
 import { ghostRate, heatmap, unmetDemand, underusedRooms, utilization } from "@/lib/analytics";
 import { groqEnabled, requestGroqJson } from "./groq";
-import { ROOM_TYPES } from "@/contracts/domain";
+import { ROOM_TYPES, type RoomType } from "@/contracts/domain";
 import { istDate } from "@/lib/time";
 import { z } from "zod";
 
@@ -26,16 +26,38 @@ function validRange(selection: ToolSelection, now: number): boolean {
   return Number.isFinite(from) && Number.isFinite(to) && from < to && to <= now && to - from <= 366 * DAY;
 }
 
+const WEEKDAYS = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+const onDay = (weekday?: number) => (weekday ? ` on ${WEEKDAYS[weekday - 1]}` : "");
+const TYPE_WORDS: [RegExp, RoomType][] = [
+  [/\blabs?\b/i, "lab"], [/classrooms?/i, "classroom"], [/seminar halls?/i, "seminar_hall"],
+  [/meeting rooms?/i, "meeting_room"], [/auditori(um|a)/i, "auditorium"],
+];
+const TYPE_PLURAL: Record<RoomType, string> = {
+  lab: "labs", classroom: "classrooms", seminar_hall: "seminar halls", meeting_room: "meeting rooms", auditorium: "auditoriums",
+};
+const GROUP_LABEL: Record<string, string> = {
+  room: "room", requester_kind: "who booked", weekday: "day", building: "building",
+  capacity_band: "size", time_band: "time of day", room_type: "room type",
+};
+const TYPE_SINGULAR: Record<RoomType, string> = {
+  lab: "lab", classroom: "classroom", seminar_hall: "seminar hall", meeting_room: "meeting room", auditorium: "auditorium",
+};
+/** "1 lab", "12 labs", "3 rooms". */
+const roomsCount = (n: number, type?: RoomType) =>
+  `${n} ${n === 1 ? (type ? TYPE_SINGULAR[type] : "room") : type ? TYPE_PLURAL[type] : "rooms"}`;
+const pct = (n: number) => `${Number(n.toFixed(1))}%`;
+
 function selectFallback(question: string, from: string, to: string): ToolSelection | null {
   const dayNames = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
   const requestedDay = dayNames.findIndex((day) => question.toLowerCase().includes(day));
   const weekday = requestedDay < 0 ? undefined : requestedDay + 1;
   const common = { from, to };
+  const roomType = TYPE_WORDS.find(([pattern]) => pattern.test(question))?.[1];
   if (/ghost|check.?in|no.?show/i.test(question)) return { tool: "get_ghost_rate", ...common, group_by: /weekday|day/i.test(question) ? "weekday" : /building/i.test(question) ? "building" : /who|kind|club|faculty|student/i.test(question) ? "requester_kind" : "room" };
   if (/unmet|wait.?list|demand|capacity gap|couldn't place/i.test(question)) return { tool: "get_unmet_demand", ...common, group_by: /time|hour/i.test(question) ? "time_band" : /type|lab|classroom|auditorium/i.test(question) ? "room_type" : "capacity_band" };
   if (/heat|busy time|peak/i.test(question)) return { tool: "get_heatmap", ...common };
-  if (/under.?used|idle/i.test(question)) return { tool: "get_underused_rooms", ...common, threshold_pct: 30, ...(weekday ? { weekday } : {}) };
-  if (/occupancy|utili[sz]|booking volume|most booked/i.test(question)) return { tool: "get_utilization", ...common, ...(weekday ? { weekday } : {}) };
+  if (/under.?used|idle/i.test(question)) return { tool: "get_underused_rooms", ...common, threshold_pct: 30, ...(roomType ? { room_type: roomType } : {}), ...(weekday ? { weekday } : {}) };
+  if (/occupancy|utili[sz]|booking volume|most booked/i.test(question)) return { tool: "get_utilization", ...common, ...(roomType ? { room_type: roomType } : {}), ...(weekday ? { weekday } : {}) };
   return null;
 }
 
@@ -63,11 +85,12 @@ export async function askDashboard(question: string): Promise<AskResponse> {
     const data = await utilization({ ...range, weekday: selection.weekday });
     rows = data.map((r) => ({ label: r.code, value: Number(r.occupancyPct.toFixed(1)) }));
     const mean = data.length ? Number((data.reduce((sum, r) => sum + r.occupancyPct, 0) / data.length).toFixed(1)) : null;
-    answerText = mean === null ? "No room utilization data was reported for this period." : `Mean room occupancy from ${istDate(range.from)} to ${istDate(range.to)} was ${mean}% across ${data.length} rooms${selection.weekday ? ` on weekday ${selection.weekday}` : ""}.`;
+    const noun = range.roomType ? TYPE_PLURAL[range.roomType] : "rooms";
+    answerText = mean === null ? `No ${noun} were booked in this period.` : `${roomsCount(data.length, range.roomType)} ${data.length === 1 ? "was" : "were"} ${mean}% booked on average${onDay(selection.weekday)} from ${istDate(range.from)} to ${istDate(range.to)}.`;
     highlights = [{ label: "Rooms", value: String(data.length) }, { label: "Mean occupancy", value: mean === null ? "No data" : `${mean}%` }];
   } else if (selection.tool === "get_heatmap") {
     const data = await heatmap(range);
-    rows = data.map((r) => ({ label: `Weekday ${r.weekday}, ${r.hour}:00`, value: Number((r.occupancy * 100).toFixed(1)) }));
+    rows = data.map((r) => ({ label: `${WEEKDAYS[r.weekday - 1]?.slice(0, 3) ?? `Day ${r.weekday}`} ${String(r.hour).padStart(2, "0")}:00`, value: Number((r.occupancy * 100).toFixed(1)) }));
     const mean = data.length ? Number((100 * data.reduce((sum, r) => sum + r.occupancy, 0) / data.length).toFixed(1)) : null;
     answerText = mean === null ? "No booking heatmap data was reported for this period." : `Mean occupancy across ${data.length} reported time slots from ${istDate(range.from)} to ${istDate(range.to)} was ${mean}%.`;
     highlights = [{ label: "Time slots", value: String(data.length) }, { label: "Mean occupancy", value: mean === null ? "No data" : `${mean}%` }];
@@ -76,19 +99,23 @@ export async function askDashboard(question: string): Promise<AskResponse> {
     rows = data.map((r) => ({ label: r.label, value: Number(r.ratePct.toFixed(1)) }));
     const bookings = data.reduce((sum, r) => sum + r.bookings, 0); const ghosts = data.reduce((sum, r) => sum + r.ghosts, 0);
     const rate = bookings ? Number((100 * ghosts / bookings).toFixed(1)) : null;
-    answerText = rate === null ? "No check-in data was reported for this period." : `The reported ghost rate from ${istDate(range.from)} to ${istDate(range.to)} was ${rate}% (${ghosts} of ${bookings} bookings), grouped by ${selection.group_by}.`;
+    answerText = rate === null ? "No check-in data was reported for this period." : `The reported ghost rate from ${istDate(range.from)} to ${istDate(range.to)} was ${rate}% (${ghosts} of ${bookings} bookings), by ${GROUP_LABEL[selection.group_by] ?? selection.group_by}.`;
     highlights = [{ label: "Bookings", value: String(bookings) }, { label: "Ghost rate", value: rate === null ? "No data" : `${rate}%` }];
   } else if (selection.tool === "get_unmet_demand") {
     const data = await unmetDemand({ ...range, groupBy: selection.group_by });
     rows = data.map((r) => ({ label: r.label, value: r.requests }));
     const count = data.reduce((sum, r) => sum + r.requests, 0); const seats = data.reduce((sum, r) => sum + r.seats, 0);
-    answerText = `Analytics reported ${count} unmet requests (${seats} seats) from ${istDate(range.from)} to ${istDate(range.to)}, grouped by ${selection.group_by}.`;
+    answerText = `${count} ${count === 1 ? "request" : "requests"} (${seats} seats in all) found no room from ${istDate(range.from)} to ${istDate(range.to)}, by ${GROUP_LABEL[selection.group_by] ?? selection.group_by}.`;
     highlights = [{ label: "Unmet requests", value: String(count) }, { label: "Seats", value: String(seats) }];
   } else {
     const data = await underusedRooms({ ...range, thresholdPct: selection.threshold_pct, roomType: selection.room_type, weekday: selection.weekday });
     rows = data.map((r) => ({ label: r.code, value: Number(r.occupancyPct.toFixed(1)) }));
     const mean = data.length ? Number((data.reduce((sum, r) => sum + r.occupancyPct, 0) / data.length).toFixed(1)) : null;
-    answerText = `Analytics reported ${data.length} rooms below the ${selection.threshold_pct}% underuse threshold${selection.weekday ? ` on weekday ${selection.weekday}` : ""}${mean === null ? "." : `; their mean occupancy was ${mean}%.`}`;
+    const noun = selection.room_type ? TYPE_PLURAL[selection.room_type] : "rooms";
+    const emptiest = [...data].sort((a, b) => a.occupancyPct - b.occupancyPct).slice(0, 3).map((r) => `${r.code} (${pct(r.occupancyPct)})`);
+    answerText = data.length === 0
+      ? `No ${noun} were under ${selection.threshold_pct}% use${onDay(selection.weekday)}.`
+      : `${roomsCount(data.length, selection.room_type)} ${data.length === 1 ? "was" : "were"} under ${selection.threshold_pct}% use${onDay(selection.weekday)}; the emptiest ${emptiest.length === 1 ? "was" : "were"} ${emptiest.join(", ")}.`;
     highlights = [{ label: "Underused rooms", value: String(data.length) }, { label: "Mean occupancy", value: mean === null ? "No data" : `${mean}%` }];
   }
   const chartRows = rows.slice(0, 30);

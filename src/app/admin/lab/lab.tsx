@@ -275,9 +275,13 @@ function Board({ scenario, scenarios, onPick }: { scenario: LabScenario; scenari
             <Button variant="outline" disabled={busy || mode !== "engine"} onClick={replay}>
               <Repeat /> Replay
             </Button>
-            <Button disabled={busy || mode !== "engine"} onClick={apply}>
-              <Check /> Apply plan
-            </Button>
+            {scenario.sandbox ? (
+              <Tag>Sandbox · nothing to apply</Tag>
+            ) : (
+              <Button disabled={busy || mode !== "engine"} onClick={apply}>
+                <Check /> Apply plan
+              </Button>
+            )}
             <Button variant="ghost" size="icon" aria-label="Reset" disabled={busy} onClick={reset}>
               <RotateCcw />
             </Button>

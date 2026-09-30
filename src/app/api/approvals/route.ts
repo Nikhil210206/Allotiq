@@ -27,7 +27,8 @@ export async function GET() {
 
   let query = supabase
     .from("requests")
-    .select("*")
+    // Who asked, so the approver can decide from the card (RequestRow.requester).
+    .select("*, requester:profiles!requests_requester_id_fkey(full_name, kind, org_name, department_id)")
     .eq("status", "pending")
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true });
@@ -38,5 +39,14 @@ export async function GET() {
 
   const { data, error } = await query;
   if (error) return apiError(500, "DB_ERROR", error.message);
-  return Response.json((data ?? []).map((r) => rowToRequest(r as Record<string, unknown>)));
+  return Response.json(
+    (data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      const who = row.requester as { full_name: string; kind: string | null; org_name: string | null; department_id: string | null } | null;
+      return {
+        ...rowToRequest(row),
+        ...(who ? { requester: { fullName: who.full_name, kind: who.kind, orgName: who.org_name, departmentId: who.department_id } } : {}),
+      };
+    }),
+  );
 }

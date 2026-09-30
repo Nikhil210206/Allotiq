@@ -52,8 +52,11 @@ export async function POST(request: Request) {
 
     const requestStates = await loadLabRequestStates(scenario.requests.map((item) => item.id));
     const baseContext = await loadEngineContext(scenarioWindow(scenario.requests));
+    // A scenario with a room pool is solved only within those rooms.
+    const pool = scenario.roomIds ? new Set(scenario.roomIds) : null;
+    const pooledContext = pool ? { ...baseContext, rooms: baseContext.rooms.filter((room) => pool.has(room.id)) } : baseContext;
     const scenarioContext = withoutScenarioMovableBookings(
-      baseContext,
+      pooledContext,
       new Set(scenario.requests.map((engineRequest) => engineRequest.id)),
     );
     const startedAt = performance.now();

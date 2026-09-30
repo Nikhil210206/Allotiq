@@ -94,9 +94,13 @@ export async function loadLabRequestStates(requestIds: string[]): Promise<LabRun
   })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
+// The requests column holds either the requests array or { roomIds, requests } to limit the Lab to a room pool.
+const ScenarioPoolSchema = z.object({ roomIds: z.array(z.uuid()).min(1).max(100), requests: z.unknown() }).strict();
+
 function mapScenario(row: { id: string; name: string; description: string | null; requests: unknown }): LabScenario {
-  const requests = validateScenarioRequests(row.requests);
-  return { id: row.id, name: row.name, description: row.description ?? "", requests };
+  const pooled = ScenarioPoolSchema.safeParse(row.requests);
+  const requests = validateScenarioRequests(pooled.success ? pooled.data.requests : row.requests);
+  return { id: row.id, name: row.name, description: row.description ?? "", requests, ...(pooled.success ? { roomIds: pooled.data.roomIds } : {}) };
 }
 
 export function validateScenarioRequests(value: unknown): EngineRequest[] {
@@ -115,7 +119,16 @@ export async function listLabScenarios(): Promise<LabScenario[]> {
     .select("id, name, description, requests")
     .order("name", { ascending: true });
   if (error) throw new Error("Unable to load Lab scenarios");
-  return (data ?? []).map(mapScenario);
+  const scenarios = (data ?? []).map(mapScenario);
+  // Scenario-only requests can't be applied (apply has no insert payload), so the UI hides Apply for them.
+  const allIds = scenarios.flatMap((scenario) => scenario.requests.map((request) => request.id));
+  const existing = new Set<string>();
+  if (allIds.length) {
+    const { data: rows, error: rowsError } = await db().from("requests").select("id").in("id", allIds);
+    if (rowsError) throw new Error("Unable to load Lab scenarios");
+    for (const row of rows ?? []) existing.add(row.id);
+  }
+  return scenarios.map((scenario) => ({ ...scenario, sandbox: !scenario.requests.some((request) => existing.has(request.id)) }));
 }
 
 export async function loadLabScenario(scenarioId: string): Promise<LabScenario | null> {

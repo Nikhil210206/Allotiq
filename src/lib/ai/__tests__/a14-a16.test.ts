@@ -44,14 +44,14 @@ describe("A15 dashboard ask", () => {
     const result = await askDashboard("show utilization");
     expect(result.via).toBe("unavailable"); expect(result.chart?.rows).toEqual([{ label: "R1", value: 50 }]);
     expect(JSON.stringify(result)).not.toContain("raw-uuid");
-    expect(result.answer).toContain("Mean room occupancy");
+    expect(result.answer).toContain("1 room was 50% booked on average");
     expect(result.answer).not.toContain("average reported value");
     expect(mocks.util).toHaveBeenCalledWith(expect.objectContaining({ from: expect.any(String), to: "2026-09-29T04:30:00.000Z" }));
   });
   it("computes unmet-demand totals with matching units and caps chart rows at 30", async () => {
     mocks.unmet.mockResolvedValue([{ key: "all", label: "All", requests: 7, seats: 45 }]);
     const result = await askDashboard("unmet requests");
-    expect(result.answer).toContain("7 unmet requests (45 seats)");
+    expect(result.answer).toContain("7 requests (45 seats in all) found no room");
     mocks.util.mockResolvedValue(Array.from({ length: 45 }, (_, i) => ({ roomId: `id-${i}`, code: `R${i}`, name: "Room", type: "classroom", buildingCode: "B", isActive: true, openHours: 10, usedHours: 1, bookings: 1, occupancyPct: 10 })));
     const capped = await askDashboard("utilization");
     expect(capped.chart?.rows).toHaveLength(30);
@@ -61,7 +61,16 @@ describe("A15 dashboard ask", () => {
     mocks.heat.mockResolvedValue([{ weekday: 5, hour: 14, booked: 2, roomHours: 4, occupancy: .5 }]);
     const result = await askDashboard("Show the booking heatmap at peak time");
     expect(mocks.heat).toHaveBeenCalledWith(expect.objectContaining({ from: expect.any(String), to: expect.any(String) }));
-    expect(mocks.util).not.toHaveBeenCalled(); expect(result.chart?.rows).toEqual([{ label: "Weekday 5, 14:00", value: 50 }]);
+    expect(mocks.util).not.toHaveBeenCalled(); expect(result.chart?.rows).toEqual([{ label: "Fri 14:00", value: 50 }]);
+  });
+  it("keeps the room type and day from the question and names the emptiest rooms", async () => {
+    mocks.under.mockResolvedValue([
+      { roomId: "a", code: "TP-402", name: "Lab", type: "lab", buildingCode: "TP", isActive: true, openHours: 10, usedHours: 2, bookings: 1, occupancyPct: 20 },
+      { roomId: "b", code: "BEL-105", name: "Lab", type: "lab", buildingCode: "BEL", isActive: true, openHours: 10, usedHours: 0, bookings: 0, occupancyPct: 0 },
+    ]);
+    const result = await askDashboard("Which labs are underused on Fridays?");
+    expect(mocks.under).toHaveBeenCalledWith(expect.objectContaining({ roomType: "lab", weekday: 5 }));
+    expect(result.answer).toBe("2 labs were under 30% use on Fridays; the emptiest were BEL-105 (0%), TP-402 (20%).");
   });
   it("ignores invalid tool output and retains safe deterministic intent", async () => {
     mocks.enabled.mockReturnValue(true); mocks.groq.mockResolvedValue('{"tool":"sql"}');

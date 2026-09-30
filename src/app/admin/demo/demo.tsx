@@ -10,8 +10,8 @@ import { JUDGE_JOIN_TOKEN } from "@/lib/seed/catalog";
 
 const SCENES = [
   { n: "01", title: "Say it, get the right room", who: "Nikhil · faculty", href: "/r/new", note: "“Need a lab with 60 systems Thursday 2 to 4 for DBMS lab” → TP-401 · judge approves on their phone" },
-  { n: "02", title: "The Lab: FCFS vs the engine", who: "Aaditya · admin", href: "/admin/lab", note: "Play FCFS → AI Club hits the wall → Run engine → 3/3 → Apply" },
-  { n: "03", title: "Maintenance, re-planned", who: "Aditi · admin", href: "/admin/disruptions", note: "UB Seminar Hall, Thursday → 4 affected · 3 rehomed · 1 offered 6 PM → Apply" },
+  { n: "02", title: "The Lab: FCFS vs the engine", who: "Aaditya · admin", href: "/admin/lab", note: "Play FCFS → 6/8, the DBMS exam and Networking lab hit the wall → Run engine → 8/8" },
+  { n: "03", title: "Maintenance, re-planned", who: "Aditi · admin", href: "/admin/disruptions", note: "UB Seminar Hall, Thursday 08:00–18:00 → 4 affected · 3 rehomed · 1 offered 6 PM → Apply" },
   { n: "04", title: "The no-show frees a room", who: "Aditi · admin", href: "/availability", note: "TP-402 at 14:00 isn't checked in → Jump to 14:16 → Robotics Club gets it" },
   { n: "05", title: "What the campus learned", who: "Nikhil · admin", href: "/admin/dashboard", note: "Heatmap · 18% ghost bookings · 7 unmet · Ask: “Which labs are underused on Fridays?”" },
 ];

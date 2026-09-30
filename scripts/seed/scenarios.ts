@@ -7,7 +7,7 @@ import { addDays, istDayOf, istIso, stableId } from "@/lib/seed/random";
 import { ids } from "./catalog";
 import { addDaysIso, istDate, toIso } from "@/lib/time";
 
-async function seedLabScenarios(db: SupabaseClient, anchor: string): Promise<void> {
+export async function seedLabScenarios(db: SupabaseClient, anchor: string): Promise<void> {
   const wednesday = istDayOf(new Date(anchor));
   const thursday = addDays(wednesday, 1);
   const makeRequest = (scenario: string, key: string, fields: {
@@ -38,15 +38,18 @@ async function seedLabScenarios(db: SupabaseClient, anchor: string): Promise<voi
     label: fields.label,
   });
 
+  // Checked against the real solvers: in this room pool FCFS places 6/8 and strands both priority requests
+  // (the exam and the academic lab — the clubs took the labs first); the engine places 8/8.
+  const clashRooms = ["TP-402", "UB-211", "HT-302", "TP-101", "HT-101", "UB-202", "BEL-SEM", "UB-BR"].map((code) => ids.room(code));
   const clashRequests = [
-    makeRequest("clash-8", "coding", { requester: "coding-club", label: "Coding Club", headcount: 50, purpose: "club_event", minute: 600 }),
-    makeRequest("clash-8", "workshop", { requester: "workshop-cell", label: "Workshop Cell", headcount: 55, features: ["projector"], purpose: "club_event", minute: 605 }),
-    makeRequest("clash-8", "ai", { requester: "ai-club", label: "AI Club", headcount: 100, features: ["projector"], purpose: "club_event", minute: 610 }),
-    makeRequest("clash-8", "networking", { requester: "priya", department: "CTECH", label: "Networking lab", headcount: 36, minSystems: 36, features: ["computers"], roomType: "lab", purpose: "academic", minute: 615 }),
-    makeRequest("clash-8", "robotics", { requester: "robotics-club", department: "MECH", label: "Robotics build", headcount: 30, minSystems: 30, features: ["computers"], roomType: "lab", purpose: "club_event", minute: 620 }),
-    makeRequest("clash-8", "seminar", { requester: "arun", department: "DSBS", label: "Department seminar", headcount: 70, features: ["projector", "mic"], roomType: "seminar_hall", purpose: "department_event", minute: 625 }),
-    makeRequest("clash-8", "review", { requester: "meena", department: "ECE", label: "Project review", headcount: 24, features: ["projector"], roomType: "meeting_room", purpose: "meeting", minute: 630 }),
-    makeRequest("clash-8", "lecture", { requester: "rahul", department: "CINTEL", label: "Student workshop", headcount: 45, features: ["projector"], purpose: "student_activity", minute: 635 }),
+    makeRequest("clash-8", "coding", { requester: "coding-club", label: "Coding Club", headcount: 38, purpose: "club_event", minute: 600 }),
+    makeRequest("clash-8", "workshop", { requester: "workshop-cell", label: "Workshop Cell", headcount: 34, purpose: "club_event", minute: 605 }),
+    makeRequest("clash-8", "ai", { requester: "ai-club", label: "AI Club", headcount: 40, features: ["projector"], purpose: "club_event", minute: 610 }),
+    makeRequest("clash-8", "lecture", { requester: "rahul", department: "CINTEL", label: "Student workshop", headcount: 45, features: ["projector"], purpose: "student_activity", minute: 615 }),
+    makeRequest("clash-8", "networking", { requester: "priya", department: "CTECH", label: "Networking lab", headcount: 36, minSystems: 36, features: ["computers"], roomType: "lab", purpose: "academic", minute: 620 }),
+    makeRequest("clash-8", "dbms-exam", { requester: "arun", department: "DSBS", label: "DBMS exam", headcount: 30, minSystems: 30, features: ["computers"], roomType: "lab", purpose: "exam", minute: 625 }),
+    makeRequest("clash-8", "seminar", { requester: "karthik", department: "MECH", label: "Department seminar", headcount: 70, features: ["projector", "mic"], purpose: "department_event", minute: 630 }),
+    makeRequest("clash-8", "review", { requester: "meena", department: "ECE", label: "Project review", headcount: 18, features: ["projector"], roomType: "meeting_room", purpose: "meeting", minute: 635 }),
   ];
   const dbmsRequests = [
     {
@@ -60,7 +63,8 @@ async function seedLabScenarios(db: SupabaseClient, anchor: string): Promise<voi
       id: "clash-8",
       name: "Thursday clash-8",
       description: "Eight requests compete for campus rooms on Thursday afternoon.",
-      requests: clashRequests,
+      // The lab_scenarios.requests column also carries an optional room pool: { roomIds, requests }.
+      requests: { roomIds: clashRooms, requests: clashRequests },
     },
     {
       id: "dbms",
