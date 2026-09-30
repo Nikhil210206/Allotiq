@@ -3,11 +3,11 @@
 // Owner: Nikhil (UI) · Aditi (API)
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Printer, Trash2, Wrench } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Printer, SearchX, Trash2, Wrench } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { AvailabilitySlot } from "@/contracts";
-import { DayGrid, ErrorNote, Eyebrow, Field, Headline, Input, Loading, Panel, RoomCode, Tag, toast } from "@/components/kit";
-import { Button } from "@/components/ui/button";
+import { DayGrid, EmptyState, ErrorNote, Eyebrow, Field, Headline, Input, Loading, Panel, RoomCode, Tag, toast } from "@/components/kit";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 import { useNow } from "@/hooks/use-clock";
 import { useRooms } from "@/hooks/use-rooms";
@@ -16,7 +16,7 @@ import { addDaysIso, fmtDay, fmtRange, fmtWhen, istDate, istMinutes, relDay, toI
 import { RoomForm, TYPE_LABEL } from "../room-form";
 
 export function RoomDetail({ id }: { id: string }) {
-  const { room: roomOf, buildingName, loading } = useRooms();
+  const { room: roomOf, buildingName, loading, error, rooms } = useRooms();
   const room = roomOf(id);
   const now = useNow(60_000);
   const { data: blackouts } = useApi(`blackouts:${id}`, () => api.rooms.blackouts(id));
@@ -33,7 +33,12 @@ export function RoomDetail({ id }: { id: string }) {
   useEffect(() => {
     if (!shownDay) return;
     let live = true;
-    const load = () => api.rooms.availability(id, shownDay).then((s) => live && setSlots(s));
+    // On failure the grid keeps its last good day (or keeps shimmering) — never shows a failed day as free.
+    const load = () =>
+      api.rooms
+        .availability(id, shownDay)
+        .then((s) => live && setSlots(s))
+        .catch(() => undefined);
     void load();
     window.addEventListener(DATA_EVENT, load);
     return () => {
@@ -42,8 +47,22 @@ export function RoomDetail({ id }: { id: string }) {
     };
   }, [id, shownDay]);
 
-  if (loading && !room) return <Loading className="pt-16" rows={3} />;
-  if (!room) return <ErrorNote className="mt-16">No such room.</ErrorNote>;
+  if (loading && !rooms.length) return <Loading className="pt-16" rows={3} />;
+  if (error && !rooms.length) return <ErrorNote className="mt-16">{error.message}</ErrorNote>;
+  if (!room)
+    return (
+      <EmptyState
+        className="mt-16"
+        icon={<SearchX />}
+        title="No such room."
+        body="It may have been removed from the catalog."
+        action={
+          <Link href="/admin/resources" className={buttonVariants({ variant: "outline" })}>
+            <ArrowLeft /> All resources
+          </Link>
+        }
+      />
+    );
   const qrUrl = qr ? `${origin}${qr.path}` : "";
 
   return (

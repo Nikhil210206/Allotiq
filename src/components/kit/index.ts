@@ -16,6 +16,7 @@ export {
   type WaveSource,
 } from "./dither-field";
 export { EmptyState } from "./empty-state";
+export { StatusPanel, StatusScreen } from "./status-screen";
 export { formatNumber, type NumberFormat } from "./format";
 export { Delta, KpiBand, KpiTile, type KpiDelta, type KpiFigure } from "./kpi-tile";
 export { NAV, ROLE_HOME, ROLE_LABEL } from "./nav";

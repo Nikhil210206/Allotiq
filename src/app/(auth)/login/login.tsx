@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { DITHER_GREEN, DitherField, Eyebrow, Headline, Wordmark, toast } from "@/components/kit";
 import { api } from "@/lib/api/client";
+import { SIGN_IN_NEXT_KEY, safeNextPath } from "@/lib/auth/link-session";
 import { cn } from "@/lib/utils";
 
 const CARDS = [
@@ -25,6 +26,14 @@ export function Login() {
   const signIn = useCallback(
     async (persona: string) => {
       setBusy(persona);
+      // Came here from a page that needs sign-in (e.g. a check-in QR)? Go back there afterwards.
+      try {
+        const next = safeNextPath(params.get("next"));
+        if (next) sessionStorage.setItem(SIGN_IN_NEXT_KEY, next);
+        else sessionStorage.removeItem(SIGN_IN_NEXT_KEY);
+      } catch {
+        // no storage (private mode): the persona's home page is the fallback
+      }
       try {
         const { redirect } = await api.demo.login(persona);
         // A full page load, not router.push: the client router can fetch the one-time link first and use it up.
@@ -34,7 +43,7 @@ export function Login() {
         setBusy(null);
       }
     },
-    [],
+    [params],
   );
 
   useEffect(() => {

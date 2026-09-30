@@ -3,10 +3,11 @@
 // start a request for that room and time. Owner: Nikhil
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, SearchX } from "lucide-react";
 import type { AvailabilitySlot } from "@/contracts";
 import type { RoomType } from "@/contracts/domain";
-import { PageHeader, Segmented, Select } from "@/components/kit";
+import { EmptyState, ErrorNote, Loading, PageHeader, Segmented, Select } from "@/components/kit";
+import { Button } from "@/components/ui/button";
 import { DayGrid, GridLegend } from "@/components/kit/day-grid";
 import { useNow } from "@/hooks/use-clock";
 import { useRooms } from "@/hooks/use-rooms";
@@ -26,11 +27,13 @@ const TYPES: { value: TypeFilter; label: string }[] = [
 export function Availability() {
   const router = useRouter();
   const now = useNow(60_000);
-  const { rooms, buildingCode } = useRooms();
+  const { rooms, buildingCode, loading: roomsLoading, error: roomsError } = useRooms();
   const [date, setDate] = useState<string | null>(null);
   const [type, setType] = useState<TypeFilter>("lab");
   const [building, setBuilding] = useState("");
   const [slots, setSlots] = useState<Record<string, AvailabilitySlot[] | undefined>>({});
+  /** Rooms whose schedule didn't load on the last attempt (they keep their last good schedule, if any). */
+  const [failed, setFailed] = useState(0);
   const day = date ?? (now ? istDate(now) : null);
 
   const shown = useMemo(
@@ -44,9 +47,17 @@ export function Availability() {
   useEffect(() => {
     if (!day || !shown.length) return;
     let live = true;
+    // A failed room must never read as "free": it keeps its last good schedule (or keeps shimmering)
+    // and the page says so; the 20-second refresh retries it.
     const load = () =>
-      Promise.all(shown.map(async (r) => [`${day}|${r.id}`, await api.rooms.availability(r.id, day).catch(() => [])] as const)).then(
-        (pairs) => live && setSlots((s) => ({ ...s, ...Object.fromEntries(pairs) })),
+      Promise.all(shown.map(async (r) => [`${day}|${r.id}`, await api.rooms.availability(r.id, day).catch(() => null)] as const)).then(
+        (pairs) => {
+          if (!live) return;
+          const loaded: Record<string, AvailabilitySlot[]> = {};
+          for (const [key, list] of pairs) if (list) loaded[key] = list;
+          setSlots((s) => ({ ...s, ...loaded }));
+          setFailed(pairs.length - Object.keys(loaded).length);
+        },
       );
     void load();
     window.addEventListener(DATA_EVENT, load);
@@ -104,17 +115,40 @@ export function Availability() {
           </Select>
         </div>
       </div>
-      <DayGrid
-        rooms={shown}
-        slots={gridSlots}
-        nowMinutes={day === today && now ? istMinutes(now) : null}
-        meta={(r) => `${buildingCode(r.buildingId)} · ${r.capacity} seats${r.systemsCount ? ` · ${r.systemsCount} PCs` : ""}`}
-        onPick={(room, startMin) => {
-          if (!day) return;
-          const q = new URLSearchParams({ room: room.id, date: day, start: hhmmOf(startMin), end: hhmmOf(Math.min(startMin + 60, 20 * 60)) });
-          router.push(`/r/new?${q}`);
-        }}
-      />
+      {failed > 0 && (
+        <ErrorNote className="mb-4">
+          {failed === shown.length ? "Couldn't load today's schedule" : `Couldn't load the schedule for ${failed} of ${shown.length} rooms`} —
+          retrying. Rooms still shimmering aren&apos;t confirmed free yet.
+        </ErrorNote>
+      )}
+      {roomsLoading && !rooms.length ? (
+        <Loading rows={5} />
+      ) : roomsError && !rooms.length ? (
+        <ErrorNote>{roomsError.message}</ErrorNote>
+      ) : !shown.length ? (
+        <EmptyState
+          icon={<SearchX />}
+          title="No rooms match."
+          body="Nothing of that type in this building. Try All, or another building."
+          action={
+            <Button variant="outline" onClick={() => { setType("all"); setBuilding(""); }}>
+              Show every room
+            </Button>
+          }
+        />
+      ) : (
+        <DayGrid
+          rooms={shown}
+          slots={gridSlots}
+          nowMinutes={day === today && now ? istMinutes(now) : null}
+          meta={(r) => `${buildingCode(r.buildingId)} · ${r.capacity} seats${r.systemsCount ? ` · ${r.systemsCount} PCs` : ""}`}
+          onPick={(room, startMin) => {
+            if (!day) return;
+            const q = new URLSearchParams({ room: room.id, date: day, start: hhmmOf(startMin), end: hhmmOf(Math.min(startMin + 60, 20 * 60)) });
+            router.push(`/r/new?${q}`);
+          }}
+        />
+      )}
       <div className="mt-5">
         <GridLegend />
       </div>

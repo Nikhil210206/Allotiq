@@ -7,6 +7,29 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { browserDb } from "@/lib/db/browser";
 
+/** sessionStorage key: the page to open after a role-card sign-in started from /login?next=<page>. */
+export const SIGN_IN_NEXT_KEY = "allotiq:sign-in-next";
+
+/** A same-origin path, or null — `next` must never send someone to another site. */
+export const safeNextPath = (next: string | null | undefined) =>
+  next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+
+// Read and clear separately: Strict Mode runs the effect twice in dev, and both runs must see the value.
+function storedNext(): string | null {
+  try {
+    return sessionStorage.getItem(SIGN_IN_NEXT_KEY);
+  } catch {
+    return null;
+  }
+}
+function clearStoredNext() {
+  try {
+    sessionStorage.removeItem(SIGN_IN_NEXT_KEY);
+  } catch {
+    // nothing stored
+  }
+}
+
 export function LinkSession() {
   const router = useRouter();
 
@@ -22,6 +45,11 @@ export function LinkSession() {
       return;
     }
 
+    // Finish the trip to the page that needed sign-in. The role cards store it (the person's real
+    // destination, e.g. a check-in QR); otherwise use the proxy's ?next=, which for a magic link is just
+    // the persona's home page the link was sent to.
+    const next = safeNextPath(storedNext()) ?? safeNextPath(new URLSearchParams(window.location.search).get("next"));
+
     // A full reload (not router.replace): the client router would reuse layouts rendered for the previous
     // user, e.g. the admin nav after switching to a faculty card.
     void browserDb()
@@ -31,10 +59,8 @@ export function LinkSession() {
           router.replace("/login?error=session");
           return;
         }
-        // The proxy bounces signed-out pages to /login?next=<page>; finish the trip there. Same-origin paths only.
-        const next = new URLSearchParams(window.location.search).get("next");
-        const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
-        window.location.replace(safeNext ?? window.location.pathname + window.location.search);
+        clearStoredNext();
+        window.location.replace(next ?? window.location.pathname + window.location.search);
       });
   }, [router]);
 

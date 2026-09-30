@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import type { UserRole } from "@/contracts/domain";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "./brand";
-import { AiChip } from "./chips";
+import { AiStatus } from "./ai-status";
 import { DemoDrawer, LiveClock } from "./demo-controls";
 import { Toaster } from "./feedback";
 import { ROLE_HOME } from "./nav";
@@ -50,7 +50,7 @@ export function AppShell(props: {
           </div>
           <div className="flex items-center gap-4">
             <LiveClock className="hidden xl:inline-flex" />
-            {ai !== undefined && <AiChip online={ai} className="hidden xl:inline-flex" />}
+            {ai !== undefined && <AiStatus initial={ai} className="hidden xl:inline-flex" />}
             <NotificationBell />
             <UserPill user={user} />
             <MobileNav role={user.role} user={user} />

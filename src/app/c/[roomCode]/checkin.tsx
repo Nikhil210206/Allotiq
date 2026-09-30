@@ -13,7 +13,7 @@ import { api } from "@/lib/api/client";
 import { fmtRange, fmtTime, istDate } from "@/lib/time";
 
 export function CheckIn({ code, k }: { code: string; k: string }) {
-  const { rooms, loading: roomsLoading, buildingName } = useRooms();
+  const { rooms, loading: roomsLoading, error: roomsError, buildingName } = useRooms();
   const now = useNow();
   const room = rooms.find((r) => r.code.toLowerCase() === code.toLowerCase());
   const today = now ? istDate(now) : null;
@@ -23,7 +23,9 @@ export function CheckIn({ code, k }: { code: string; k: string }) {
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  if (roomsLoading || !now) return <Loading rows={2} />;
+  // Rooms reload after every action (check-in included); only the first load shows the skeleton.
+  if ((roomsLoading && !rooms.length) || !now) return <Loading rows={2} />;
+  if (roomsError && !rooms.length) return <ErrorNote>Couldn&apos;t load this room — {roomsError.message}</ErrorNote>;
   if (!room) return <ErrorNote>There&apos;s no room with the code {code}. Check the sticker on the door.</ErrorNote>;
 
   const t = now.getTime();

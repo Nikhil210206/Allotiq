@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { DemoControls, Eyebrow, Headline, Panel, Tag } from "@/components/kit";
+import { JUDGE_JOIN_TOKEN } from "@/lib/seed/catalog";
 
 const SCENES = [
   { n: "01", title: "Say it, get the right room", who: "Nikhil · faculty", href: "/r/new", note: "“Need a lab with 60 systems Thursday 2 to 4 for DBMS lab” → TP-401 · judge approves on their phone" },
@@ -21,7 +22,9 @@ export function Demo() {
     const t = setTimeout(() => setOrigin(window.location.origin), 0);
     return () => clearTimeout(t);
   }, []);
-  const joinUrl = `${origin}/login?as=approver`;
+  // /join checks the seeded token and signs in as the demo approver; unlike the role cards it works in
+  // production without DEMO_MODE.
+  const joinUrl = `${origin}/join?t=${encodeURIComponent(JUDGE_JOIN_TOKEN)}`;
 
   return (
     <div className="flex flex-col gap-10 pt-6 pb-16 md:pt-10">

@@ -1,7 +1,7 @@
 // Writes the catalog (src/lib/seed/catalog.ts) to Supabase with stable ids, so a reseed keeps user ids
 // (sessions) and room qr_secrets (printed QR codes) valid. Owner: Nikhil · N3
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { BUILDINGS, DEPARTMENTS, ROOMS, USERS, emailOf, ids } from "@/lib/seed/catalog";
+import { BUILDINGS, DEPARTMENTS, JUDGE_JOIN_TOKEN, ROOMS, USERS, emailOf, ids } from "@/lib/seed/catalog";
 
 export * from "@/lib/seed/catalog";
 
@@ -79,7 +79,7 @@ export async function seedCatalog(db: SupabaseClient): Promise<void> {
   await check(
     "demo_token judge",
     db.from("demo_tokens").upsert({
-      token: "demo-judge-token",
+      token: JUDGE_JOIN_TOKEN,
       user_id: ids.user("judge"),
       expires_at: null,
       used_count: 0

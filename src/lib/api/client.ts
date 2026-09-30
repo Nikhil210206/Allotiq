@@ -21,6 +21,11 @@ import type {
 import type { AuditRow, DashboardFilters, DashboardMetrics, LabReplayResponse, LabScenario, RequestRow } from "./types";
 
 export const DATA_EVENT = "allotiq:data";
+/** Fired after each real AI response: Groq answered (online) or a built-in fallback did. */
+export const AI_EVENT = "allotiq:ai";
+export interface AiStatusDetail {
+  online: boolean;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -76,6 +81,9 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, json);
+  // AI answers say who produced them; the shell's AI chip follows the latest one.
+  if (json && typeof json === "object" && "via" in json && typeof json.via === "string")
+    window.dispatchEvent(new CustomEvent<AiStatusDetail>(AI_EVENT, { detail: { online: json.via === "groq" } }));
   if (method !== "GET") window.dispatchEvent(new Event(DATA_EVENT));
   return json as T;
 }
