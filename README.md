@@ -6,7 +6,7 @@
 
 Room finders answer *"what's free?"*. Allotiq answers *"what's the best arrangement for everyone?"* — and keeps it optimal through no-shows, maintenance and priority requests.
 
-Vision2Web 2026 · SRMIST · Industry Innovation 2 — Smart Resource Allocation System
+Vision2Web Winner 2026 · SRMIST · Industry Innovation 2 — Smart Resource Allocation System
 
 [Contracts](docs/CONTRACTS.md) · [Deploy runbook](docs/DEPLOY.md)
 
